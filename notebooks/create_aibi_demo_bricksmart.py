@@ -1,8 +1,14 @@
 # Databricks notebook source
 # DBTITLE 1,コンフィグ
-catalog = "skato"
-new_schema = "demo_aibi" # 新規スキーマを指定する場合
-exist_schema = "demo_aibi" # 既存スキーマを指定する場合
+# Widgetsの作成
+dbutils.widgets.text("catalog", "skato", "カタログ名")
+dbutils.widgets.text("new_schema", "demo_aibi", "新規スキーマ名")
+dbutils.widgets.text("exist_schema", "demo_aibi", "既存スキーマ名")
+
+# Widgetからの値の取得
+catalog = dbutils.widgets.get("catalog")
+new_schema = dbutils.widgets.get("new_schema")
+exist_schema = dbutils.widgets.get("exist_schema")
 
 # COMMAND ----------
 
