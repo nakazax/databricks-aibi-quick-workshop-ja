@@ -1,1 +1,1 @@
-# databricks-aibi-quick-workshop-ja
+# Databricks AI/BI Quick Workshop
