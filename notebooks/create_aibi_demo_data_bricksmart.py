@@ -1,14 +1,16 @@
 # Databricks notebook source
 # DBTITLE 1,コンフィグ
 # Widgetsの作成
-dbutils.widgets.text("catalog", "skato", "カタログ名")
+dbutils.widgets.text("catalog", "hinak_catalog_aws_usw2", "カタログ名")
 dbutils.widgets.text("new_schema", "demo_aibi", "新規スキーマ名")
-dbutils.widgets.text("exist_schema", "demo_aibi", "既存スキーマ名")
+dbutils.widgets.text("existing_schema", "demo_aibi", "既存スキーマ名")
 
 # Widgetからの値の取得
 catalog = dbutils.widgets.get("catalog")
 new_schema = dbutils.widgets.get("new_schema")
-exist_schema = dbutils.widgets.get("exist_schema")
+existing_schema = dbutils.widgets.get("existing_schema")
+
+catalog, new_schema, existing_schema
 
 # COMMAND ----------
 
@@ -21,14 +23,13 @@ spark.sql(f"USE SCHEMA {new_schema}")
 
 # 既存スキーマを指定する場合
 # spark.sql(f"USE CATALOG {catalog}")
-# spark.sql(f"USE SCHEMA {exist_schema}")
+# spark.sql(f"USE SCHEMA {existing_schema}")
 
 # COMMAND ----------
 
 # DBTITLE 1,users, products, transactions, feedbacksテーブルの生成
 
 from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek
-from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
 import datetime
