@@ -244,7 +244,6 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN type COMMENT "文字列、'商品'、'サービス'、'その他'";
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN rating COMMENT "整数、1から5までの評価";
 # MAGIC COMMENT ON TABLE feedbacks IS 'feedbacksテーブルには、オンラインスーパー「ブリックスマート」における様々な商品へのユーザーフィードバックデータが含まれます。これには、ユーザの評価、フィードバックの日付、フィードバックの種類などの詳細が含まれます。このデータは、ユーザーの嗜好を理解し、製品の問題を特定し、時間の経過に伴うユーザー満足度の変化を追跡するために使用することができます。また、報告された問題の頻度や深刻度に基づいて、製品の改善に優先順位をつける際にも役立ちます。';
-# MAGIC
 
 # COMMAND ----------
 
@@ -279,3 +278,33 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE gold_user ALTER COLUMN daily_rating COMMENT "浮動小数点数、日用品の平均レビュー評価";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN other_rating COMMENT "浮動小数点数、その他の平均レビュー評価";
 # MAGIC COMMENT ON TABLE gold_user IS '`gold_user`テーブルには、AIを搭載した食品推薦システムに登録したユーザーに関する情報が含まれている。これには、人口統計学的詳細、食品消費習慣、および評価が含まれる。このデータは、ユーザーの嗜好を理解し、食品の消費傾向を追跡し、AIシステムの有効性を評価するために使用することができる。また、システムの潜在的な改善点を特定し、消費パターンと評価に基づいて個々のユーザーに合わせた推薦を行う際にも役立ちます。'
+
+# COMMAND ----------
+
+# DBTITLE 1,PIIタグの追加
+# MAGIC %sql
+# MAGIC ALTER TABLE users ALTER COLUMN name SET TAGS ('pii_name');
+# MAGIC ALTER TABLE users ALTER COLUMN email SET TAGS ('pii_email');
+# MAGIC ALTER TABLE gold_user ALTER COLUMN name SET TAGS ('pii_name');
+# MAGIC ALTER TABLE gold_user ALTER COLUMN email SET TAGS ('pii_email');
+
+# COMMAND ----------
+
+# DBTITLE 1,PK & FKの追加
+# MAGIC %sql
+# MAGIC ALTER TABLE users ALTER COLUMN user_id SET NOT NULL;
+# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_id SET NOT NULL;
+# MAGIC ALTER TABLE products ALTER COLUMN product_id SET NOT NULL;
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN feedback_id SET NOT NULL;
+# MAGIC ALTER TABLE gold_user ALTER COLUMN user_id SET NOT NULL;
+
+# MAGIC ALTER TABLE users ADD CONSTRAINT users_pk PRIMARY KEY (user_id);
+# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_pk PRIMARY KEY (transaction_id);
+# MAGIC ALTER TABLE products ADD CONSTRAINT products_pk PRIMARY KEY (product_id);
+# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_pk PRIMARY KEY (feedback_id);
+# MAGIC ALTER TABLE gold_user ADD CONSTRAINT gold_user_pk PRIMARY KEY (user_id);
+
+# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED RELY;
+# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
+# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED RELY;
+# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
