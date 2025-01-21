@@ -1,7 +1,7 @@
 # Databricks notebook source
 # DBTITLE 1,コンフィグ
 # Widgetsの作成
-dbutils.widgets.text("catalog", "hinak_catalog_aws_usw2", "カタログ名")
+dbutils.widgets.text("catalog", "", "カタログ名")
 dbutils.widgets.text("new_schema", "demo_aibi", "新規スキーマ名")
 dbutils.widgets.text("existing_schema", "demo_aibi", "既存スキーマ名")
 
@@ -10,7 +10,17 @@ catalog = dbutils.widgets.get("catalog")
 new_schema = dbutils.widgets.get("new_schema")
 existing_schema = dbutils.widgets.get("existing_schema")
 
-catalog, new_schema, existing_schema
+# COMMAND ----------
+
+# DBTITLE 1,パラメーターのチェック
+print(f"catalog: {catalog}")
+print(f"new_schema: {new_schema}")
+print(f"existing_schema: {existing_schema}")
+
+if not catalog:
+    raise ValueError("存在するカタログ名を入力してください。")
+if not new_schema:
+    raise ValueError("新規スキーマ名を入力してください。")
 
 # COMMAND ----------
 
