@@ -1,9 +1,9 @@
 # Databricks notebook source
-# DBTITLE 1,コンフィグ
+# DBTITLE 1,パラメーターの設定
 # Widgetsの作成
 dbutils.widgets.text("catalog", "", "カタログ名")
-dbutils.widgets.text("new_schema", "demo_aibi", "新規スキーマ名")
-dbutils.widgets.text("existing_schema", "demo_aibi", "既存スキーマ名")
+dbutils.widgets.text("new_schema", "bricksmart", "新規スキーマ名")
+dbutils.widgets.text("existing_schema", "bricksmart", "既存スキーマ名")
 
 # Widgetからの値の取得
 catalog = dbutils.widgets.get("catalog")
@@ -38,7 +38,6 @@ spark.sql(f"USE SCHEMA {new_schema}")
 # COMMAND ----------
 
 # DBTITLE 1,users, products, transactions, feedbacksテーブルの生成
-
 from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek
 from pyspark.sql.types import StringType
 
@@ -318,3 +317,11 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
 # MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED RELY;
 # MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
+
+# COMMAND ----------
+
+# DBTITLE 1,列レベルマスキングの追加
+# MAGIC %sql
+# MAGIC CREATE FUNCTION mask_email(email STRING) RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END;
+# MAGIC ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
+# MAGIC ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email;
