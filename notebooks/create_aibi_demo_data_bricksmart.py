@@ -219,40 +219,40 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,テーブルのメタデータ編集
 # MAGIC %sql
-# MAGIC ALTER TABLE users ALTER COLUMN user_id COMMENT "整数、ユニーク（主キー）";
-# MAGIC ALTER TABLE users ALTER COLUMN name COMMENT "文字列";
-# MAGIC ALTER TABLE users ALTER COLUMN age COMMENT "整数、0以上";
-# MAGIC ALTER TABLE users ALTER COLUMN gender COMMENT "文字列、'男性'、'女性'、'その他'";
-# MAGIC ALTER TABLE users ALTER COLUMN email COMMENT "文字列、メールフォーマット";
-# MAGIC ALTER TABLE users ALTER COLUMN registration_date COMMENT "日付、YYYY-MM-DDフォーマット";
-# MAGIC ALTER TABLE users ALTER COLUMN region COMMENT "文字列、例: '東京'、'大阪'、'北海道'";
-# MAGIC COMMENT ON TABLE users IS 'usersテーブルには、オンラインスーパー「ブリックスマート」に登録されているユーザーに関する情報が含まれています。これには、年齢、性別、地域などの人口統計データや連絡先の詳細が含まれます。このデータは、ユーザーのセグメンテーション、ユーザーの嗜好の理解、さまざまなユーザーグループのニーズに合わせたプラットフォームの特徴量の調整に使用できます。また、ユーザーのエンゲージメントを追跡し、マーケティングキャンペーンの成功を測定するのにも役立ちます。';
+# MAGIC ALTER TABLE users ALTER COLUMN user_id COMMENT "ユーザーID";
+# MAGIC ALTER TABLE users ALTER COLUMN name COMMENT "氏名";
+# MAGIC ALTER TABLE users ALTER COLUMN age COMMENT "年齢: 0以上";
+# MAGIC ALTER TABLE users ALTER COLUMN gender COMMENT "性別: 例) 男性, 女性, その他";
+# MAGIC ALTER TABLE users ALTER COLUMN email COMMENT "メールアドレス";
+# MAGIC ALTER TABLE users ALTER COLUMN registration_date COMMENT "登録日";
+# MAGIC ALTER TABLE users ALTER COLUMN region COMMENT "地域: 例) 東京, 大阪, 北海道";
+# MAGIC COMMENT ON TABLE users IS '**usersテーブル**\nオンラインスーパー「ブリックスマート」に登録されているユーザー情報を保持するテーブルです。\n- ユーザーの基本情報（氏名、年齢、性別、地域など）や連絡先（メールアドレス）を管理\n- ユーザーのセグメンテーションや嗜好分析、マーケティング効果測定などに活用できます';
 # MAGIC
-# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_id COMMENT "整数、ユニーク（主キー）";
-# MAGIC ALTER TABLE transactions ALTER COLUMN user_id COMMENT "整数、`users`テーブルの`user_id`とリンク（外部キー）";
-# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_date COMMENT "日付、YYYY-MM-DDフォーマット";
-# MAGIC ALTER TABLE transactions ALTER COLUMN product_id COMMENT "整数";
-# MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "整数、1以上";
-# MAGIC ALTER TABLE transactions ALTER COLUMN price COMMENT "浮動小数点数、0以上";
-# MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "整数、購買が行われた店舗のID";
-# MAGIC COMMENT ON TABLE transactions IS 'transactionsテーブルには、オンラインスーパー「ブリックスマート」のユーザーによる販売取引に関する情報が含まれます。商品ID、数量、価格、取引日、店舗IDなどの詳細が含まれます。このデータは、販売傾向の分析、ユーザー行動の追跡、さまざまな商品の人気の把握に使用できます。また、最も人気のある店舗や商品を特定するのに役立ち、より良い在庫管理やマーケティング戦略を可能にします。';
+# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_id COMMENT "トランザクションID";
+# MAGIC ALTER TABLE transactions ALTER COLUMN user_id COMMENT "ユーザーID: usersテーブルのuser_idとリンクする外部キー";
+# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_date COMMENT "購入日";
+# MAGIC ALTER TABLE transactions ALTER COLUMN product_id COMMENT "商品ID: productsテーブルのproduct_idとリンクする外部キー";
+# MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "購入数量: 1以上";
+# MAGIC ALTER TABLE transactions ALTER COLUMN price COMMENT "購入時価格: 0以上";
+# MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "店舗ID";
+# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日時や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
 # MAGIC
-# MAGIC ALTER TABLE products ALTER COLUMN product_id COMMENT "整数、ユニーク（主キー）";
-# MAGIC ALTER TABLE products ALTER COLUMN product_name COMMENT "文字列";
-# MAGIC ALTER TABLE products ALTER COLUMN category COMMENT "文字列、例: '食料品'、'日用品'";
-# MAGIC ALTER TABLE products ALTER COLUMN subcategory COMMENT "文字列、例: '野菜'、'洗剤'";
-# MAGIC ALTER TABLE products ALTER COLUMN price COMMENT "浮動小数点数、0以上";
-# MAGIC ALTER TABLE products ALTER COLUMN stock_quantity COMMENT "整数、在庫数量";
-# MAGIC ALTER TABLE products ALTER COLUMN cost_price COMMENT "浮動小数点数、仕入れ価格";
-# MAGIC COMMENT ON TABLE products IS 'productsテーブルには、オンラインスーパー「ブリックスマート」で入手可能なさまざまな商品に関する情報が含まれています。商品名、カテゴリー、サブカテゴリー、価格、在庫数、原価などの詳細が含まれます。このデータは、在庫管理、価格分析、製品分類に使用できます。また、製品のパフォーマンスを追跡し、特定のカテゴリーやサブカテゴリーにおける成長の機会を特定するのにも役立ちます。';
+# MAGIC ALTER TABLE products ALTER COLUMN product_id COMMENT "商品ID";
+# MAGIC ALTER TABLE products ALTER COLUMN product_name COMMENT "商品名";
+# MAGIC ALTER TABLE products ALTER COLUMN category COMMENT "カテゴリー: 例) 食料品, 日用品";
+# MAGIC ALTER TABLE products ALTER COLUMN subcategory COMMENT "サブカテゴリー: 例) 野菜, 洗剤";
+# MAGIC ALTER TABLE products ALTER COLUMN price COMMENT "販売価格: 0以上";
+# MAGIC ALTER TABLE products ALTER COLUMN stock_quantity COMMENT "在庫数量";
+# MAGIC ALTER TABLE products ALTER COLUMN cost_price COMMENT "仕入れ価格";
+# MAGIC COMMENT ON TABLE products IS '**productsテーブル**\nオンラインスーパー「ブリックスマート」で取り扱う商品の情報を管理するテーブルです。\n- 商品名、カテゴリー・サブカテゴリー、価格、在庫数、原価などを保持\n- 在庫管理、価格分析、商品分類や商品のパフォーマンス分析に活用できます';
 # MAGIC
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN feedback_id COMMENT "整数、ユニーク（主キー）";
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN user_id COMMENT "整数、`users`テーブルの`user_id`とリンク（外部キー）";
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN comment COMMENT "文字列";
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN date COMMENT "日付、YYYY-MM-DDフォーマット";
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN type COMMENT "文字列、'商品'、'サービス'、'その他'";
-# MAGIC ALTER TABLE feedbacks ALTER COLUMN rating COMMENT "整数、1から5までの評価";
-# MAGIC COMMENT ON TABLE feedbacks IS 'feedbacksテーブルには、オンラインスーパー「ブリックスマート」における様々な商品へのユーザーフィードバックデータが含まれます。これには、ユーザの評価、フィードバックの日付、フィードバックの種類などの詳細が含まれます。このデータは、ユーザーの嗜好を理解し、製品の問題を特定し、時間の経過に伴うユーザー満足度の変化を追跡するために使用することができます。また、報告された問題の頻度や深刻度に基づいて、製品の改善に優先順位をつける際にも役立ちます。';
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN feedback_id COMMENT "フィードバックID";
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN user_id COMMENT "ユーザーID: usersテーブルのuser_idとリンクする外部キー";
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN comment COMMENT "コメント";
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN date COMMENT "フィードバック日";
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN type COMMENT "フィードバック種別: 商品, サービス, その他";
+# MAGIC ALTER TABLE feedbacks ALTER COLUMN rating COMMENT "評価: 1～5";
+# MAGIC COMMENT ON TABLE feedbacks IS '**feedbacksテーブル**\nユーザーからのフィードバックを管理するテーブルです。\n- 商品やサービスに対するコメント、評価(1～5)、フィードバック日などを保持\n- ユーザー満足度の把握や改善点の分析、優先度付けに役立ちます';
 
 # COMMAND ----------
 
@@ -280,13 +280,13 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,gold_usersテーブルのメタデータ編集
 # MAGIC %sql
-# MAGIC ALTER TABLE gold_user ALTER COLUMN food_quantity COMMENT "浮動小数点数、食料品の合計購買点数";
-# MAGIC ALTER TABLE gold_user ALTER COLUMN daily_quantity COMMENT "浮動小数点数、日用品の合計購買点数";
-# MAGIC ALTER TABLE gold_user ALTER COLUMN other_quantity COMMENT "浮動小数点数、その他の合計購買点数";
-# MAGIC ALTER TABLE gold_user ALTER COLUMN food_rating COMMENT "浮動小数点数、食料品の平均レビュー評価";
-# MAGIC ALTER TABLE gold_user ALTER COLUMN daily_rating COMMENT "浮動小数点数、日用品の平均レビュー評価";
-# MAGIC ALTER TABLE gold_user ALTER COLUMN other_rating COMMENT "浮動小数点数、その他の平均レビュー評価";
-# MAGIC COMMENT ON TABLE gold_user IS '`gold_user`テーブルには、AIを搭載した食品推薦システムに登録したユーザーに関する情報が含まれている。これには、人口統計学的詳細、食品消費習慣、および評価が含まれる。このデータは、ユーザーの嗜好を理解し、食品の消費傾向を追跡し、AIシステムの有効性を評価するために使用することができる。また、システムの潜在的な改善点を特定し、消費パターンと評価に基づいて個々のユーザーに合わせた推薦を行う際にも役立ちます。'
+# MAGIC ALTER TABLE gold_user ALTER COLUMN food_quantity COMMENT "食料品の合計購買点数";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN daily_quantity COMMENT "日用品の合計購買点数";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN other_quantity COMMENT "その他の合計購買点数";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN food_rating COMMENT "食料品の平均レビュー評価";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN daily_rating COMMENT "日用品の平均レビュー評価";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN other_rating COMMENT "その他の平均レビュー評価";
+# MAGIC COMMENT ON TABLE gold_user IS '**gold_userテーブル**\nAIを搭載した食品推薦システムに登録したユーザーに関する情報が含まれています。\n- 人口統計学的詳細、食品消費習慣、および評価などを保持\n- ユーザーの嗜好を理解し、食品の消費傾向を追跡、AIシステムの有効性を評価するのに活用\n- 個々のユーザーに合わせた食品推薦やシステム改善の検討にも役立ちます';
 
 # COMMAND ----------
 
