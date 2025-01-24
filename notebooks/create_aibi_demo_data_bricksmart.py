@@ -262,6 +262,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC   with avg_data as(
 # MAGIC   SELECT 
 # MAGIC     u.user_id,
+# MAGIC     FLOOR(age/10)*10 as age_group,
 # MAGIC     SUM(CASE WHEN p.category = '食料品' THEN t.quantity ELSE 0 END) AS food_quantity,
 # MAGIC     SUM(CASE WHEN p.category = '日用品' THEN t.quantity ELSE 0 END) AS daily_quantity,
 # MAGIC     SUM(CASE WHEN p.category NOT IN ('食料品', '日用品') THEN t.quantity ELSE 0 END) AS other_quantity,
@@ -280,6 +281,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,gold_usersテーブルのメタデータ編集
 # MAGIC %sql
+# MAGIC ALTER TABLE gold_user ALTER COLUMN age_group COMMENT "年代: 10刻みの年齢グループ (例: 20, 30, 40)";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN food_quantity COMMENT "食料品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN daily_quantity COMMENT "日用品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN other_quantity COMMENT "その他の合計購買点数";
