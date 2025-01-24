@@ -259,10 +259,11 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # DBTITLE 1,gold_usersテーブルの生成
 # MAGIC %sql
 # MAGIC CREATE OR REPLACE TABLE gold_user AS (
-# MAGIC   with avg_data as(
+# MAGIC   -- ユーザーごとの購買・評価データを集計
+# MAGIC   with user_metrics as (
 # MAGIC   SELECT 
 # MAGIC     u.user_id,
-# MAGIC     FLOOR(age/10)*10 as age_group,
+# MAGIC     FLOOR(u.age/10)*10 as age_group,
 # MAGIC     SUM(CASE WHEN p.category = '食料品' THEN t.quantity ELSE 0 END) AS food_quantity,
 # MAGIC     SUM(CASE WHEN p.category = '日用品' THEN t.quantity ELSE 0 END) AS daily_quantity,
 # MAGIC     SUM(CASE WHEN p.category NOT IN ('食料品', '日用品') THEN t.quantity ELSE 0 END) AS other_quantity,
@@ -273,8 +274,9 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC   LEFT JOIN transactions t ON u.user_id = t.user_id
 # MAGIC   LEFT JOIN products p ON t.product_id = p.product_id
 # MAGIC   LEFT JOIN feedbacks f ON u.user_id = f.user_id
-# MAGIC   GROUP BY u.user_id)
-# MAGIC   select * from users join avg_data using(user_id)
+# MAGIC   GROUP BY u.user_id, u.age)
+# MAGIC   -- ユーザー基本情報と購買・評価指標を結合
+# MAGIC   SELECT * FROM users JOIN user_metrics USING (user_id)
 # MAGIC );
 
 # COMMAND ----------
