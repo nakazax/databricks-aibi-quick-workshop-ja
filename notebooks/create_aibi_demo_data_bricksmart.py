@@ -72,9 +72,9 @@ def generate_users(num_users=10000):
     return spark.range(1, num_users + 1).withColumnRenamed("id", "user_id")\
                 .withColumn("name", generate_username_udf())\
                 .withColumn("age", round(rand() * 60 + 18))\
-                .withColumn("gender", when(rand() < 0.03, lit("その他"))
-                    .when(rand() < 0.10, lit("未回答"))
-                    .when(rand() < 0.55, lit("男性"))
+                .withColumn("gender", when(rand() < 0.02, lit("その他"))
+                    .when(rand() < 0.06, lit("未回答"))
+                    .when(rand() < 0.53, lit("男性"))
                     .otherwise(lit("女性")))\
                 .withColumn("email", expr("concat(name, '@example.com')"))\
                 .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))\
@@ -225,7 +225,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE users ALTER COLUMN user_id COMMENT "ユーザーID";
 # MAGIC ALTER TABLE users ALTER COLUMN name COMMENT "氏名";
 # MAGIC ALTER TABLE users ALTER COLUMN age COMMENT "年齢: 0以上";
-# MAGIC ALTER TABLE users ALTER COLUMN gender COMMENT "性別: 例) 男性, 女性, その他";
+# MAGIC ALTER TABLE users ALTER COLUMN gender COMMENT "性別: 例) 男性, 女性, 未回答, その他";
 # MAGIC ALTER TABLE users ALTER COLUMN email COMMENT "メールアドレス";
 # MAGIC ALTER TABLE users ALTER COLUMN registration_date COMMENT "登録日";
 # MAGIC ALTER TABLE users ALTER COLUMN region COMMENT "地域: 例) 東京, 大阪, 北海道";
@@ -266,7 +266,11 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC   with user_metrics as (
 # MAGIC   SELECT 
 # MAGIC     u.user_id,
-# MAGIC     FLOOR(u.age/10)*10 as age_group,
+# MAGIC     CASE 
+# MAGIC       WHEN u.age < 35 THEN '若年層'
+# MAGIC       WHEN u.age < 55 THEN '中年層'
+# MAGIC       ELSE 'シニア層'
+# MAGIC     END as age_group,
 # MAGIC     SUM(CASE WHEN p.category = '食料品' THEN t.quantity ELSE 0 END) AS food_quantity,
 # MAGIC     SUM(CASE WHEN p.category = '日用品' THEN t.quantity ELSE 0 END) AS daily_quantity,
 # MAGIC     SUM(CASE WHEN p.category NOT IN ('食料品', '日用品') THEN t.quantity ELSE 0 END) AS other_quantity,
@@ -286,7 +290,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,gold_usersテーブルのメタデータ編集
 # MAGIC %sql
-# MAGIC ALTER TABLE gold_user ALTER COLUMN age_group COMMENT "年代: 10刻みの年齢グループ (例: 20, 30, 40)";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN age_group COMMENT "年齢層: 若年層(～34歳), 中年層(35～54歳), シニア層(55歳～)";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN food_quantity COMMENT "食料品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN daily_quantity COMMENT "日用品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN other_quantity COMMENT "その他の合計購買点数";
