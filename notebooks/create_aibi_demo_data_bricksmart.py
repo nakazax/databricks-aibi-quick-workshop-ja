@@ -72,7 +72,10 @@ def generate_users(num_users=10000):
     return spark.range(1, num_users + 1).withColumnRenamed("id", "user_id")\
                 .withColumn("name", generate_username_udf())\
                 .withColumn("age", round(rand() * 60 + 18))\
-                .withColumn("gender", when(rand() > 0.5, lit("男性")).otherwise(lit("女性")))\
+                .withColumn("gender", when(rand() < 0.03, lit("その他"))
+                    .when(rand() < 0.10, lit("未回答"))
+                    .when(rand() < 0.55, lit("男性"))
+                    .otherwise(lit("女性")))\
                 .withColumn("email", expr("concat(name, '@example.com')"))\
                 .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))\
                 .withColumn("region", expr("case when rand() < 0.2 then '北海道' when rand() < 0.4 then '東京' when rand() < 0.6 then '大阪' when rand() < 0.8 then '福岡' else '沖縄' end"))
