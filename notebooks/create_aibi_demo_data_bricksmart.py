@@ -244,7 +244,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE transactions ALTER COLUMN transaction_date COMMENT "購入日";
 # MAGIC ALTER TABLE transactions ALTER COLUMN product_id COMMENT "商品ID: productsテーブルのproduct_idとリンクする外部キー";
 # MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "購入数量: 1以上";
-# MAGIC ALTER TABLE transactions ALTER COLUMN price COMMENT "購入時価格: 0以上";
+# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_price COMMENT "購入時価格: 0以上, transactions.quantity * products.price で計算";
 # MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "店舗ID";
 # MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日時や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
 # MAGIC
@@ -344,3 +344,41 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC CREATE FUNCTION mask_email(email STRING) RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END;
 # MAGIC ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
 # MAGIC ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email;
+
+# COMMAND ----------
+
+# DBTITLE 1,地域ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC -- 地域ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC WITH region_category_sales AS (
+# MAGIC     SELECT 
+# MAGIC         u.region,
+# MAGIC         p.category,
+# MAGIC         SUM(t.transaction_price) AS total_sales
+# MAGIC     FROM transactions t
+# MAGIC     JOIN users u ON t.user_id = u.user_id
+# MAGIC     JOIN products p ON t.product_id = p.product_id
+# MAGIC     GROUP BY u.region, p.category
+# MAGIC ),
+# MAGIC region_sales_total AS (
+# MAGIC     -- 地域ごとの全売上高を集計
+# MAGIC     SELECT 
+# MAGIC         region,
+# MAGIC         SUM(total_sales) AS total_region_sales
+# MAGIC     FROM region_category_sales
+# MAGIC     GROUP BY region
+# MAGIC )
+# MAGIC
+# MAGIC -- 最終的に地域ごとのカテゴリ売上高と売上比率を計算
+# MAGIC SELECT 
+# MAGIC     rcs.region,
+# MAGIC     rcs.category,
+# MAGIC     rcs.total_sales,
+# MAGIC     rst.total_region_sales,
+# MAGIC     CASE 
+# MAGIC         WHEN rst.total_region_sales > 0 THEN (rcs.total_sales / rst.total_region_sales) * 100
+# MAGIC         ELSE 0
+# MAGIC     END AS sales_ratio
+# MAGIC FROM region_category_sales rcs
+# MAGIC JOIN region_sales_total rst ON rcs.region = rst.region
+# MAGIC ORDER BY rcs.region, rcs.total_sales DESC;
