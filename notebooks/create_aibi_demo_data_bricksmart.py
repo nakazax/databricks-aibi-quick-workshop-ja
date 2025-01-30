@@ -1,7 +1,7 @@
 # Databricks notebook source
 # DBTITLE 1,パラメーターの設定
 # Widgetsの作成
-dbutils.widgets.text("catalog", "", "カタログ名")
+dbutils.widgets.text("catalog", "aibi_demo_catalog", "カタログ名")
 dbutils.widgets.text("new_schema", "bricksmart", "新規スキーマ名")
 dbutils.widgets.text("existing_schema", "bricksmart", "既存スキーマ名")
 
@@ -37,7 +37,7 @@ spark.sql(f"USE SCHEMA {new_schema}")
 
 # COMMAND ----------
 
-# DBTITLE 1,users, products, transactions, feedbacksテーブルの生成
+# DBTITLE 1,ユーザーデータ・商品データの生成
 from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek
 from pyspark.sql.types import StringType
 
@@ -93,7 +93,13 @@ def generate_products(num_products=100):
 users = generate_users()
 products = generate_products()
 
+display(users.limit(5))
+display(products.limit(5))
 
+# COMMAND ----------
+
+# DBTITLE 1,販売取引データ・フィードバックデータの生成
+# 購買行動に関する傾向スコア（重み）の設定
 conditions = [
     # 若年層は新鮮な果物に興味があり、より多く購入する傾向がある。
     ((col("age") < 25) & (col("subcategory") == "果物"), 1),
@@ -163,7 +169,6 @@ def generate_transactions(users, products, num_transactions=1000000):
         .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))
         .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))
         .withColumn("quantity", round(rand() * 5 + 1))
-        .withColumn("price", round(rand() * 1000 + 100, 2))
         .withColumn("store_id", round(rand() * 10 + 1))
         .withColumn("random_date", expr("date_add(date('2024-01-01'), -CAST(rand() * 365 AS INTEGER))"))
         .withColumn("month", date_format("random_date", "M").cast("int"))
@@ -175,14 +180,17 @@ def generate_transactions(users, products, num_transactions=1000000):
         )
         .drop("random_date", "month", "is_weekend")
     )
-    
-    # 傾向スコアに基づいてquantityを調整
-    # return transactions
-    adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id","category","subcategory"), "product_id")
+
+    # 傾向スコアに基づいて数量を調整
+    adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id", "price", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
         adjusted_transaction = adjusted_transaction.withColumn("quantity", when(condition, col("quantity") + adjustment).otherwise(col("quantity")))
     adjusted_transaction = adjusted_transaction.withColumn("quantity", greatest(lit(0), "quantity"))
-    return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "price", "transaction_date", "store_id")
+
+    # 購入時価格を数量 × 販売価格に設定
+    adjusted_transaction = adjusted_transaction.withColumn("transaction_price", col("quantity") * col("price"))
+
+    return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "transaction_price", "transaction_date", "store_id")
 
 # フィードバックデータの生成
 def generate_feedbacks(users, products, num_feedbacks=50000):
@@ -207,8 +215,8 @@ transactions = generate_transactions(users, products)
 feedbacks = generate_feedbacks(users, products)
 
 # 結果の表示（データフレームのサイズによっては表示が重くなる可能性があるため、小さなサンプルで表示）
-transactions.show(5)
-feedbacks.show(5)
+display(transactions.limit(5))
+display(feedbacks.limit(5))
 
 # COMMAND ----------
 
