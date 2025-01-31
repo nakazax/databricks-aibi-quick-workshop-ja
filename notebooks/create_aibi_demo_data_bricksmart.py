@@ -389,3 +389,87 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ORDER BY
 # MAGIC   `region_sales`.`region`,
 # MAGIC   `region_sales`.`category`;
+
+# COMMAND ----------
+
+# DBTITLE 1,性別ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC WITH `gender_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `gender`,
+# MAGIC     `category`,
+# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC   FROM
+# MAGIC     `transactions` t
+# MAGIC   JOIN
+# MAGIC     `users` u ON t.user_id = u.user_id
+# MAGIC   WHERE
+# MAGIC     `transaction_price` IS NOT NULL
+# MAGIC     AND `gender` IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     `gender`,
+# MAGIC     `category`
+# MAGIC ),
+# MAGIC `total_gender_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `gender`,
+# MAGIC     SUM(`total_sales`) AS `gender_total_sales`
+# MAGIC   FROM
+# MAGIC     `gender_sales`
+# MAGIC   GROUP BY
+# MAGIC     `gender`
+# MAGIC )
+# MAGIC SELECT
+# MAGIC   `gender_sales`.`gender`,
+# MAGIC   `gender_sales`.`category`,
+# MAGIC   FLOOR(`gender_sales`.`total_sales`),
+# MAGIC   ROUND((`gender_sales`.`total_sales` / `total_gender_sales`.`gender_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC FROM
+# MAGIC   `gender_sales`
+# MAGIC JOIN
+# MAGIC   `total_gender_sales` ON `gender_sales`.`gender` = `total_gender_sales`.`gender`
+# MAGIC ORDER BY
+# MAGIC   `gender_sales`.`gender`,
+# MAGIC   `gender_sales`.`category`;
+
+# COMMAND ----------
+
+# DBTITLE 1,年齢層ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC WITH `age_group_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `age_group`,
+# MAGIC     `category`,
+# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC   FROM
+# MAGIC     `transactions` t
+# MAGIC   JOIN
+# MAGIC     `gold_user` gu ON t.user_id = gu.user_id
+# MAGIC   WHERE
+# MAGIC     `transaction_price` IS NOT NULL
+# MAGIC     AND `age_group` IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     `age_group`,
+# MAGIC     `category`
+# MAGIC ),
+# MAGIC `total_age_group_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `age_group`,
+# MAGIC     SUM(`total_sales`) AS `age_group_total_sales`
+# MAGIC   FROM
+# MAGIC     `age_group_sales`
+# MAGIC   GROUP BY
+# MAGIC     `age_group`
+# MAGIC )
+# MAGIC SELECT
+# MAGIC   `age_group_sales`.`age_group`,
+# MAGIC   `age_group_sales`.`category`,
+# MAGIC   FLOOR(`age_group_sales`.`total_sales`),
+# MAGIC   ROUND((`age_group_sales`.`total_sales` / `total_age_group_sales`.`age_group_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC FROM
+# MAGIC   `age_group_sales`
+# MAGIC JOIN
+# MAGIC   `total_age_group_sales` ON `age_group_sales`.`age_group` = `total_age_group_sales`.`age_group`
+# MAGIC ORDER BY
+# MAGIC   `age_group_sales`.`age_group`,
+# MAGIC   `age_group_sales`.`category`;
