@@ -69,39 +69,103 @@ generate_productname_udf = udf(generate_productname, StringType())
 
 # ユーザーデータの生成
 def generate_users(num_users=10000):
-    return spark.range(1, num_users + 1).withColumnRenamed("id", "user_id")\
-                .withColumn("name", generate_username_udf())\
-                .withColumn("age", round(rand() * 60 + 18))\
-                .withColumn("gender", when(rand() < 0.02, lit("その他"))
-                    .when(rand() < 0.06, lit("未回答"))
-                    .when(rand() < 0.53, lit("男性"))
-                    .otherwise(lit("女性")))\
-                .withColumn("email", expr("concat(name, '@example.com')"))\
-                .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))\
-                .withColumn("region", expr("case when rand() < 0.2 then '北海道' when rand() < 0.4 then '東京' when rand() < 0.6 then '大阪' when rand() < 0.8 then '福岡' else '沖縄' end"))
+    """
+    ユーザーデータを生成し、指定された数のデータを返します。
+    
+    パラメータ:
+    num_users (int): 生成するユーザーの数 (デフォルトは10000)
+    
+    戻り値:
+    DataFrame: 生成されたユーザー情報を含むSpark DataFrame
+    
+    各ユーザーには以下のカラムが含まれます:
+    - user_id: ユーザーID (1からnum_usersまでの範囲)
+    - name: ランダムなユーザー名
+    - age: ランダムな年齢 (一様分布: 18歳以上78歳未満)
+    - gender: ランダムな性別 (男性48%、女性47%、その他2%、未回答3%)
+    - email: ユーザー名を基にしたメールアドレス
+    - registration_date: 固定の日付 (2020年1月1日)
+    - region: ランダムな地域 (一様分布: 北海道、東京、大阪、福岡、沖縄)
+    """
+    return (
+        spark.range(1, num_users + 1)
+        .withColumnRenamed("id", "user_id")
+        .withColumn("name", generate_username_udf())
+        .withColumn("age", round(rand() * 60 + 18))
+        .withColumn("rand_gender", rand())
+        .withColumn(
+            "gender",
+            when(col("rand_gender") < 0.02, lit("その他")) # 2%
+            .when(col("rand_gender") < 0.05, lit("未回答")) # 0.02 + 0.03 (3%)
+            .when(col("rand_gender") < 0.53, lit("男性")) # 0.05 + 0.48 (48%)
+            .otherwise(lit("女性")) # 残り47%
+        )
+        .withColumn("email", concat(col("name"), lit("@example.com")))
+        .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))
+        .withColumn("rand_region", rand())
+        .withColumn(
+            "region",
+            when(col("rand_region") < 0.2, lit("北海道"))
+            .when(col("rand_region") < 0.4, lit("東京"))
+            .when(col("rand_region") < 0.6, lit("大阪"))
+            .when(col("rand_region") < 0.8, lit("福岡"))
+            .otherwise(lit("沖縄"))
+        )
+        .drop("rand_gender", "rand_region")
+    )
 
 # 商品データの生成
 def generate_products(num_products=100):
-    return spark.range(1, num_products + 1).withColumnRenamed("id", "product_id")\
-                .withColumn("product_name", generate_productname_udf())\
-                .withColumn("category", when(rand() > 0.5, lit("食料品")).otherwise(lit("日用品")))\
-                .withColumn("subcategory", 
-                    when(col("category") == "食料品", 
-                        when(rand() > 0.6, lit("野菜"))
-                        .when(rand() > 0.4, lit("果物"))
-                        .when(rand() > 0.2, lit("健康食品"))
-                        .otherwise(lit("肉類"))
-                    )
-                    .otherwise(
-                        when(rand() > 0.4, lit("キッチン用品"))
-                        .when(rand() > 0.3, lit("スポーツ・アウトドア用品"))
-                        .when(rand() > 0.2, lit("医薬品"))
-                        .otherwise(lit("冷暖房器具"))
-                    )
-                )\
-                .withColumn("price", round(rand() * 1000 + 100, 2))\
-                .withColumn("stock_quantity", round(rand() * 100 + 1))\
-                .withColumn("cost_price", round(col("price") * 0.7, 2))
+    """
+    商品データを生成し、指定された数のデータを返します。
+    
+    パラメータ:
+    num_products (int): 生成する商品の数 (デフォルトは100)
+    
+    戻り値:
+    DataFrame: 生成された商品情報を含むSpark DataFrame
+    
+    各商品には以下のカラムが含まれます:
+    - product_id: 商品ID (1からnum_productsまでの範囲)
+    - product_name: ランダムな商品名
+    - category: カテゴリ (食料品50%、日用品50%)
+    - subcategory: サブカテゴリ
+      食料品の場合: 野菜25%、果物25%、健康食品25%、肉類25%
+      日用品の場合: キッチン用品25%、スポーツ・アウトドア用品25%、医薬品25%、冷暖房器具25%
+    - price: 商品価格 (100円以上1100円未満の範囲)
+    - stock_quantity: 在庫数 (1以上101未満の範囲)
+    - cost_price: 仕入れ価格 (販売価格の70%)
+    """
+    return (
+        spark.range(1, num_products + 1)
+        .withColumnRenamed("id", "product_id")
+        .withColumn("product_name", generate_productname_udf())
+        .withColumn("rand_category", rand())
+        .withColumn(
+            "category",
+            when(col("rand_category") < 0.5, lit("食料品")).otherwise(lit("日用品"))
+        )
+        .withColumn("rand_subcategory", rand())
+        .withColumn(
+            "subcategory",
+            when(
+                col("category") == "食料品",
+                when(col("rand_subcategory") < 0.25, lit("野菜"))
+                .when(col("rand_subcategory") < 0.50, lit("果物"))
+                .when(col("rand_subcategory") < 0.75, lit("健康食品"))
+                .otherwise(lit("肉類"))
+            ).otherwise(
+                when(col("rand_subcategory") < 0.25, lit("キッチン用品"))
+                .when(col("rand_subcategory") < 0.50, lit("スポーツ・アウトドア用品"))
+                .when(col("rand_subcategory") < 0.75, lit("医薬品"))
+                .otherwise(lit("冷暖房器具"))
+            )
+        )
+        .withColumn("price", round(rand() * 1000 + 100, 2))
+        .withColumn("stock_quantity", round(rand() * 100 + 1))
+        .withColumn("cost_price", round(col("price") * 0.7, 2))
+        .drop("rand_category", "rand_subcategory")
+    )
 
 users = generate_users()
 products = generate_products()
@@ -173,6 +237,32 @@ conditions = [
 
 # トランザクションデータの生成
 def generate_transactions(users, products, num_transactions=1000000):
+    """
+    トランザクションデータを生成し、指定された数のデータを返します。
+
+    パラメータ:
+    users (DataFrame): ユーザーデータを含むSpark DataFrame
+    products (DataFrame): 商品データを含むSpark DataFrame
+    num_transactions (int): 生成するトランザクションの数 (デフォルトは1000000)
+
+    戻り値:
+    DataFrame: 生成されたトランザクション情報を含むSpark DataFrame
+
+    各トランザクションには以下のカラムが含まれます:
+    - transaction_id: トランザクションID (1からnum_transactionsまでの範囲)
+    - user_id: ユーザーID (1から登録ユーザー数までの範囲)
+    - product_id: 商品ID (1から登録商品数までの範囲)
+    - quantity: 購入数量 (1以上6以下の整数、傾向スコアによって調整)
+    - store_id: 店舗ID (1以上11以下の整数)
+    - transaction_date: 取引日 (2023年1月1日から2024年1月1日までの範囲)
+        - 8月と12月は10%の確率で特定の日付を選択
+        - 週末は10%の確率で特定の日付を選択
+    - transaction_price: 取引金額 (quantity * price)
+
+    傾向スコア:
+    ユーザーの属性や商品カテゴリに基づいて購入数量を調整します。
+    最終的な数量は0以上の範囲に収まるように調整されます。
+    """
     transactions = (
         spark.range(1, num_transactions + 1).withColumnRenamed("id", "transaction_id")
         .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))
@@ -190,32 +280,68 @@ def generate_transactions(users, products, num_transactions=1000000):
         .drop("random_date", "month", "is_weekend")
     )
 
-    # ユーザーと商品データをジョインして傾向スコアに基づいて数量を調整
+    # 傾向スコアに基づいて購入数量を調整
     adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id", "price", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
         adjusted_transaction = adjusted_transaction.withColumn("quantity", when(condition, col("quantity") + adjustment).otherwise(col("quantity")))
-
     adjusted_transaction = adjusted_transaction.withColumn("quantity", greatest(lit(0), "quantity"))
     adjusted_transaction = adjusted_transaction.withColumn("transaction_price", col("quantity") * col("price"))
 
+    # 調整済みトランザクションデータを返却
     return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "transaction_price", "transaction_date", "store_id")
 
 # フィードバックデータの生成
 def generate_feedbacks(users, products, num_feedbacks=50000):
-    feedbacks = spark.range(1, num_feedbacks + 1).withColumnRenamed("id", "feedback_id")\
-                      .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))\
-                      .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))\
-                      .withColumn("rating", round(rand() * 4 + 1))\
-                      .withColumn("date", expr("date_add(date('2022-01-01'), -CAST(rand() * 365 AS INTEGER))"))\
-                      .withColumn("type", when(rand() > 0.66, lit("商品")).when(rand() > 0.33, lit("サービス")).otherwise(lit("その他")))\
-                      .withColumn("comment", expr("concat('Feedback_', feedback_id)"))
+    """
+    フィードバックデータを生成し、指定された数のデータを返します。
     
-    # 傾向スコアに基づいてratingを調整
-    adjusted_feedbacks = feedbacks.join(users, "user_id").join(products.select("product_id","category","subcategory"), "product_id")
+    パラメータ:
+    users (DataFrame): ユーザーデータを含むSpark DataFrame
+    products (DataFrame): 商品データを含むSpark DataFrame
+    num_feedbacks (int): 生成するフィードバックの数 (デフォルトは50000)
+    
+    戻り値:
+    DataFrame: 生成されたフィードバック情報を含むSpark DataFrame
+    
+    各フィードバックには以下のカラムが含まれます:
+    - feedback_id: フィードバックID (1からnum_feedbacksまでの範囲)
+    - user_id: ユーザーID (1から登録ユーザー数までの範囲)
+    - product_id: 商品ID (1から登録商品数までの範囲)
+    - rating: 評価 (1以上5以下の整数、傾向スコアによって調整)
+    - date: フィードバック日付 (2021年1月1日から2022年1月1日までの範囲)
+    - type: フィードバック種別 (商品45%、サービス45%、その他10%)
+    - comment: コメント (Feedback_[feedback_id]の形式)
+    
+    傾向スコア:
+    ユーザーの属性や商品カテゴリに基づいて評価を調整します。
+    最終的な評価は0以上5以下の範囲に収まるように調整されます。
+    """
+    feedbacks = (
+        spark.range(1, num_feedbacks + 1)
+        .withColumnRenamed("id", "feedback_id")
+        .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))
+        .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))
+        .withColumn("rating", round(rand() * 4 + 1))
+        .withColumn("date", expr("date_add(date('2022-01-01'), -CAST(rand() * 365 AS INTEGER))"))
+        .withColumn("rand_type", rand())
+        .withColumn(
+            "type",
+            when(col("rand_type") < 0.45, lit("商品"))
+            .when(col("rand_type") < 0.90, lit("サービス"))
+            .otherwise(lit("その他"))
+        )
+        .drop("rand_type")
+        .withColumn("comment", expr("concat('Feedback_', feedback_id)"))
+    )
+    
+    # 傾向スコアに基づいて評価を調整
+    adjusted_feedbacks = feedbacks.join(users, "user_id").join(products.select("product_id", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
-        adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", when(condition, col("rating") + adjustment).otherwise(col("rating")))
-    adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", greatest(lit(0), least(lit(5), "rating")))
+        adjusted_feedbacks = adjusted_feedbacks.withColumn("rating",
+            when(condition, col("rating") + adjustment).otherwise(col("rating")))
+    adjusted_feedbacks = adjusted_feedbacks.withColumn("rating",greatest(lit(0), least(lit(5), "rating")))
 
+    # 調整済みフィードバックデータを返却
     return adjusted_feedbacks.select("feedback_id", "user_id", "product_id", "rating", "date", "type", "comment")
 
 transactions = generate_transactions(users, products)
