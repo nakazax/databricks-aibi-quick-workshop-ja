@@ -532,19 +532,21 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC %sql
 # MAGIC WITH gender_sales AS (
 # MAGIC   SELECT
-# MAGIC     gender,
-# MAGIC     category,
-# MAGIC     SUM(transaction_price) AS total_sales
+# MAGIC     u.gender,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
 # MAGIC   FROM
 # MAGIC     transactions t
 # MAGIC   JOIN
 # MAGIC     users u ON t.user_id = u.user_id
+# MAGIC   JOIN
+# MAGIC     products p ON t.product_id = p.product_id
 # MAGIC   WHERE
-# MAGIC     transaction_price IS NOT NULL
-# MAGIC     AND gender IS NOT NULL
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND u.gender IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     gender,
-# MAGIC     category
+# MAGIC     u.gender,
+# MAGIC     p.category
 # MAGIC ),
 # MAGIC total_gender_sales AS (
 # MAGIC   SELECT
@@ -574,19 +576,21 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC %sql
 # MAGIC WITH age_group_sales AS (
 # MAGIC   SELECT
-# MAGIC     age_group,
-# MAGIC     category,
-# MAGIC     SUM(transaction_price) AS total_sales
+# MAGIC     gu.age_group,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
 # MAGIC   FROM
 # MAGIC     transactions t
 # MAGIC   JOIN
 # MAGIC     gold_user gu ON t.user_id = gu.user_id
+# MAGIC   JOIN
+# MAGIC     products p ON t.product_id = p.product_id
 # MAGIC   WHERE
-# MAGIC     transaction_price IS NOT NULL
-# MAGIC     AND age_group IS NOT NULL
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND gu.age_group IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     age_group,
-# MAGIC     category
+# MAGIC     gu.age_group,
+# MAGIC     p.category
 # MAGIC ),
 # MAGIC total_age_group_sales AS (
 # MAGIC   SELECT
