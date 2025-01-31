@@ -1,7 +1,7 @@
 # Databricks notebook source
 # DBTITLE 1,パラメーターの設定
 # Widgetsの作成
-dbutils.widgets.text("catalog", "", "カタログ名")
+dbutils.widgets.text("catalog", "aibi_demo_catalog", "カタログ名")
 dbutils.widgets.text("new_schema", "bricksmart", "新規スキーマ名")
 dbutils.widgets.text("existing_schema", "bricksmart", "既存スキーマ名")
 
@@ -37,8 +37,8 @@ spark.sql(f"USE SCHEMA {new_schema}")
 
 # COMMAND ----------
 
-# DBTITLE 1,users, products, transactions, feedbacksテーブルの生成
-from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek
+# DBTITLE 1,ユーザーデータ・商品データの生成
+from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek, concat
 from pyspark.sql.types import StringType
 
 import datetime
@@ -69,101 +69,211 @@ generate_productname_udf = udf(generate_productname, StringType())
 
 # ユーザーデータの生成
 def generate_users(num_users=10000):
-    return spark.range(1, num_users + 1).withColumnRenamed("id", "user_id")\
-                .withColumn("name", generate_username_udf())\
-                .withColumn("age", round(rand() * 60 + 18))\
-                .withColumn("gender", when(rand() < 0.02, lit("その他"))
-                    .when(rand() < 0.06, lit("未回答"))
-                    .when(rand() < 0.53, lit("男性"))
-                    .otherwise(lit("女性")))\
-                .withColumn("email", expr("concat(name, '@example.com')"))\
-                .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))\
-                .withColumn("region", expr("case when rand() < 0.2 then '北海道' when rand() < 0.4 then '東京' when rand() < 0.6 then '大阪' when rand() < 0.8 then '福岡' else '沖縄' end"))
+    """
+    ユーザーデータを生成し、指定された数のデータを返します。
+    
+    パラメータ:
+    num_users (int): 生成するユーザーの数 (デフォルトは10000)
+    
+    戻り値:
+    DataFrame: 生成されたユーザー情報を含むSpark DataFrame
+    
+    各ユーザーには以下のカラムが含まれます:
+    - user_id: ユーザーID (1からnum_usersまでの範囲)
+    - name: ランダムなユーザー名
+    - age: ランダムな年齢 (一様分布: 18歳以上78歳未満)
+    - gender: ランダムな性別 (男性48%、女性47%、その他2%、未回答3%)
+    - email: ユーザー名を基にしたメールアドレス
+    - registration_date: 固定の日付 (2020年1月1日)
+    - region: ランダムな地域 (一様分布: 北海道、東京、大阪、福岡、沖縄)
+    """
+    return (
+        spark.range(1, num_users + 1)
+        .withColumnRenamed("id", "user_id")
+        .withColumn("name", generate_username_udf())
+        .withColumn("age", round(rand() * 60 + 18))
+        .withColumn("rand_gender", rand())
+        .withColumn(
+            "gender",
+            when(col("rand_gender") < 0.02, lit("その他")) # 2%
+            .when(col("rand_gender") < 0.05, lit("未回答")) # 0.02 + 0.03 (3%)
+            .when(col("rand_gender") < 0.53, lit("男性")) # 0.05 + 0.48 (48%)
+            .otherwise(lit("女性")) # 残り47%
+        )
+        .withColumn("email", concat(col("name"), lit("@example.com")))
+        .withColumn("registration_date", lit(datetime.date(2020, 1, 1)))
+        .withColumn("rand_region", rand())
+        .withColumn(
+            "region",
+            when(col("rand_region") < 0.2, lit("北海道"))
+            .when(col("rand_region") < 0.4, lit("東京"))
+            .when(col("rand_region") < 0.6, lit("大阪"))
+            .when(col("rand_region") < 0.8, lit("福岡"))
+            .otherwise(lit("沖縄"))
+        )
+        .drop("rand_gender", "rand_region")
+    )
 
 # 商品データの生成
 def generate_products(num_products=100):
-    return spark.range(1, num_products + 1).withColumnRenamed("id", "product_id")\
-                .withColumn("product_name", generate_productname_udf())\
-                .withColumn("category", when(rand() > 0.5, lit("食料品")).otherwise(lit("日用品")))\
-                .withColumn("subcategory", when(col("category") == "食料品", when(rand() > 0.5, lit("野菜")).otherwise(lit("果物"))).otherwise(when(rand() > 0.5, lit("洗剤")).otherwise(lit("トイレットペーパー"))))\
-                .withColumn("price", round(rand() * 1000 + 100, 2))\
-                .withColumn("stock_quantity", round(rand() * 100 + 1))\
-                .withColumn("cost_price", round(col("price") * 0.7, 2))
+    """
+    商品データを生成し、指定された数のデータを返します。
+    
+    パラメータ:
+    num_products (int): 生成する商品の数 (デフォルトは100)
+    
+    戻り値:
+    DataFrame: 生成された商品情報を含むSpark DataFrame
+    
+    各商品には以下のカラムが含まれます:
+    - product_id: 商品ID (1からnum_productsまでの範囲)
+    - product_name: ランダムな商品名
+    - category: カテゴリ (食料品50%、日用品50%)
+    - subcategory: サブカテゴリ
+      食料品の場合: 野菜25%、果物25%、健康食品25%、肉類25%
+      日用品の場合: キッチン用品25%、スポーツ・アウトドア用品25%、医薬品25%、冷暖房器具25%
+    - price: 商品価格 (100円以上1100円未満の範囲)
+    - stock_quantity: 在庫数 (1以上101未満の範囲)
+    - cost_price: 仕入れ価格 (販売価格の70%)
+    """
+    return (
+        spark.range(1, num_products + 1)
+        .withColumnRenamed("id", "product_id")
+        .withColumn("product_name", generate_productname_udf())
+        .withColumn("rand_category", rand())
+        .withColumn(
+            "category",
+            when(col("rand_category") < 0.5, lit("食料品")).otherwise(lit("日用品"))
+        )
+        .withColumn("rand_subcategory", rand())
+        .withColumn(
+            "subcategory",
+            when(
+                col("category") == "食料品",
+                when(col("rand_subcategory") < 0.25, lit("野菜"))
+                .when(col("rand_subcategory") < 0.50, lit("果物"))
+                .when(col("rand_subcategory") < 0.75, lit("健康食品"))
+                .otherwise(lit("肉類"))
+            ).otherwise(
+                when(col("rand_subcategory") < 0.25, lit("キッチン用品"))
+                .when(col("rand_subcategory") < 0.50, lit("スポーツ・アウトドア用品"))
+                .when(col("rand_subcategory") < 0.75, lit("医薬品"))
+                .otherwise(lit("冷暖房器具"))
+            )
+        )
+        .withColumn("price", round(rand() * 1000 + 100, 2))
+        .withColumn("stock_quantity", round(rand() * 100 + 1))
+        .withColumn("cost_price", round(col("price") * 0.7, 2))
+        .drop("rand_category", "rand_subcategory")
+    )
 
 users = generate_users()
 products = generate_products()
 
+display(users.limit(5))
+display(products.limit(5))
 
+# COMMAND ----------
+
+# DBTITLE 1,テーブルの書き込み
+users.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("users")
+products.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("products")
+
+# COMMAND ----------
+
+# DBTITLE 1,販売取引データ・フィードバックデータの生成
+# 購買行動に関する傾向スコア（重み）の設定
 conditions = [
-    # 若年層は新鮮な果物に興味があり、より多く購入する傾向がある。
-    ((col("age") < 25) & (col("subcategory") == "果物"), 1),
-    
-    # 25歳から30歳のユーザーは日用品の購入において実用性を重視しやすい。
-    ((col("age") >= 25) & (col("age") < 30) & (col("category") == "日用品"), 2),
-    
-    # 30歳から35歳は健康に気を使い始め、野菜の購入量が増える。
-    ((col("age") >= 30) & (col("age") < 35) & (col("subcategory") == "野菜"), 1),
-    
-    # 女性は特定の日用品に対して特別なニーズがあり、それに関連する商品の購入を増やす可能性がある。
-    ((col("gender") == "女性") & (col("category") == "日用品"), 1),
-    
-    # 東京のユーザーは食生活において多様性を求める傾向があり、食料品の購入量が増える。
+    # ---------- 地域ごとの傾向 ----------
+    # 東京: 食生活において多様性を求める傾向があり、食料品の購入量が増える
     ((col("region") == "東京") & (col("category") == "食料品"), 1),
-    
-    # 大阪のユーザーは実用的な日用品の購入を好む。
+
+    # 大阪: 実用的な日用品の購入を好む
     ((col("region") == "大阪") & (col("category") == "日用品"), 1),
-    
-    # 福岡のユーザーは新鮮な果物への関心が高い。
-    ((col("region") == "福岡") & (col("subcategory") == "果物"), -2),
-    
-    # 北海道のユーザーは寒い地域特有の生活用品に対する需要が高い。
-    ((col("region") == "北海道") & (col("category") == "日用品"), 1),
-    
-    # 沖縄のユーザーは地元の果物を好む傾向がある。
-    ((col("region") == "沖縄") & (col("subcategory") == "果物"), 2),
-    
-    # 中年層は健康に対する意識が高まり、野菜の消費を増やす。
-    ((col("age") >= 35) & (col("age") < 50) & (col("subcategory") == "野菜"), 2),
-    
-    # 若年層の男性は、スポーツやアウトドア関連の商品に関心が高いと仮定する。
-    ((col("age") < 30) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
-    
-    # 高齢者は、健康関連商品や日用品に対して高い関心を持つ。
-    ((col("age") >= 60) & (col("category") == "日用品"), -2),
-    
-    # 女性は美容と健康に関連する食品に対して高い関心を持つ。
-    ((col("gender") == "女性") & (col("category") == "食料品"), 1),
-    
-    # 東京の若年層はトレンドに敏感であり、新商品を試す傾向がある。
-    ((col("region") == "東京") & (col("age") < 30), 1),
-    
-    # 大阪の中年層は家庭を持つことが多く、食料品の購入量が増える。
-    ((col("region") == "大阪") & (col("age") >= 30) & (col("age") < 50) & (col("category") == "食料品"), 2),
-    
-    # 福岡のユーザーは地域の特産品に対して高い関心を持ち、関連商品の購入を好む。
+
+    # 福岡: 健康志向の高い野菜を多く購入
     ((col("region") == "福岡") & (col("subcategory") == "野菜"), 1),
-    
-    # 北海道の若年層はアウトドア活動に関心が高いと仮定し、関連商品の購入が増える。
-    ((col("region") == "北海道") & (col("age") < 30) & (col("category") == "日用品"), 1),
-    
-    # 沖縄の高齢者は地元の伝統食に高い関心を持つ。
-    ((col("region") == "沖縄") & (col("age") >= 60) & (col("category") == "食料品"), -2),
-    
-    # 若年層は便利さを求めて日用品を購入する傾向がある。
-    ((col("age") < 25) & (col("category") == "日用品"), 1),
-    
-    # 中年層の男性は、家庭用品に対する責任感から、関連商品の購入量を増やす。
-    ((col("age") >= 35) & (col("age") < 50) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
+
+    # 北海道: 寒冷地のため冷暖房器具の購入量が増える
+    ((col("region") == "北海道") & (col("subcategory") == "冷暖房器具"), 2),
+
+    # 沖縄: 地元の果物への関心が高い。さらに温暖な気候のため冷暖房器具の購入量が増える
+    ((col("region") == "沖縄") & (col("subcategory") == "果物"), 1),
+    ((col("region") == "沖縄") & (col("subcategory") == "冷暖房器具"), 1),
+
+    # ---------- 性別ごとの傾向 ----------
+    # 女性: 食料品や日用品、特にキッチン用品を多く購入
+    ((col("gender") == "女性") & (col("category") == "食料品"), 1),
+    ((col("gender") == "女性") & (col("category") == "日用品"), 1),
+    ((col("gender") == "女性") & (col("subcategory") == "キッチン用品"), 1),
+
+    # 男性: スポーツやアウトドア関連の商品に関心が高い。さらに肉類を好む傾向が強い
+    ((col("gender") == "男性") & (col("category") == "スポーツ・アウトドア用品"), 2),
+    ((col("gender") == "男性") & (col("subcategory") == "肉類"), 1),
+
+    # ---------- 年齢層ごとの傾向 ----------
+    # 若年層 (18〜34歳): 果物、肉類、スポーツ・アウトドア用品に関心が高い
+    ((col("age") < 35) & (col("subcategory") == "果物"), 1),
+    ((col("age") < 35) & (col("subcategory") == "肉類"), 2),
+    ((col("age") < 35) & (col("subcategory") == "スポーツ・アウトドア用品"), 2),
+
+    # 中年層 (35〜54歳): 健康志向が高まり野菜の購入量が増える。肉類もそれなりに購入。医薬品の購入量も増える
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "野菜"), 1),
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "肉類"), 1),
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "医薬品"), 1),
+
+    # シニア層 (55歳以上): 果物と野菜、医薬品の購入量が増える
+    ((col("age") >= 55) & (col("subcategory") == "果物"), 2),
+    ((col("age") >= 55) & (col("subcategory") == "野菜"), 2),
+    ((col("age") >= 55) & (col("subcategory") == "医薬品"), 2),
+
+    # ---------- 組み合わせによる傾向 ----------
+    # 東京の若年層: 消費行動が旺盛で全体的な購入量が多い
+    ((col("region") == "東京") & (col("age") < 35), 1),
+
+    # 大阪の中年層: 家庭を持ち、食料品の購入量が増える
+    ((col("region") == "大阪") & (col("age") >= 35) & (col("age") < 55) & (col("category") == "食料品"), 2),
+
+    # 北海道の若年層: アウトドア活動に関連する日用品を購入する
+    ((col("region") == "北海道") & (col("age") < 35) & (col("category") == "日用品"), 1),
+
+    # 沖縄のシニア層は地元の伝統食に高い関心を持つ
+    ((col("region") == "沖縄") & (col("age") >= 55) & (col("category") == "食料品"), 2),
 ]
 
 # トランザクションデータの生成
 def generate_transactions(users, products, num_transactions=1000000):
+    """
+    トランザクションデータを生成し、指定された数のデータを返します。
+
+    パラメータ:
+    users (DataFrame): ユーザーデータを含むSpark DataFrame
+    products (DataFrame): 商品データを含むSpark DataFrame
+    num_transactions (int): 生成するトランザクションの数 (デフォルトは1000000)
+
+    戻り値:
+    DataFrame: 生成されたトランザクション情報を含むSpark DataFrame
+
+    各トランザクションには以下のカラムが含まれます:
+    - transaction_id: トランザクションID (1からnum_transactionsまでの範囲)
+    - user_id: ユーザーID (1から登録ユーザー数までの範囲)
+    - product_id: 商品ID (1から登録商品数までの範囲)
+    - quantity: 購入数量 (1以上6以下の整数、傾向スコアによって調整)
+    - store_id: 店舗ID (1以上11以下の整数)
+    - transaction_date: 取引日 (2023年1月1日から2024年1月1日までの範囲)
+        - 8月と12月は10%の確率で特定の日付を選択
+        - 週末は10%の確率で特定の日付を選択
+    - transaction_price: 取引金額 (quantity * price)
+
+    傾向スコア:
+    ユーザーの属性や商品カテゴリに基づいて購入数量を調整します。
+    最終的な数量は0以上の範囲に収まるように調整されます。
+    """
     transactions = (
         spark.range(1, num_transactions + 1).withColumnRenamed("id", "transaction_id")
         .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))
         .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))
         .withColumn("quantity", round(rand() * 5 + 1))
-        .withColumn("price", round(rand() * 1000 + 100, 2))
         .withColumn("store_id", round(rand() * 10 + 1))
         .withColumn("random_date", expr("date_add(date('2024-01-01'), -CAST(rand() * 365 AS INTEGER))"))
         .withColumn("month", date_format("random_date", "M").cast("int"))
@@ -175,46 +285,83 @@ def generate_transactions(users, products, num_transactions=1000000):
         )
         .drop("random_date", "month", "is_weekend")
     )
-    
-    # 傾向スコアに基づいてquantityを調整
-    # return transactions
-    adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id","category","subcategory"), "product_id")
+
+    # 傾向スコアに基づいて購入数量を調整
+    adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id", "price", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
         adjusted_transaction = adjusted_transaction.withColumn("quantity", when(condition, col("quantity") + adjustment).otherwise(col("quantity")))
     adjusted_transaction = adjusted_transaction.withColumn("quantity", greatest(lit(0), "quantity"))
-    return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "price", "transaction_date", "store_id")
+    adjusted_transaction = adjusted_transaction.withColumn("transaction_price", col("quantity") * col("price"))
+
+    # 調整済みトランザクションデータを返却
+    return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "transaction_price", "transaction_date", "store_id")
 
 # フィードバックデータの生成
 def generate_feedbacks(users, products, num_feedbacks=50000):
-    feedbacks = spark.range(1, num_feedbacks + 1).withColumnRenamed("id", "feedback_id")\
-                      .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))\
-                      .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))\
-                      .withColumn("rating", round(rand() * 4 + 1))\
-                      .withColumn("date", expr("date_add(date('2022-01-01'), -CAST(rand() * 365 AS INTEGER))"))\
-                      .withColumn("type", when(rand() > 0.66, lit("商品")).when(rand() > 0.33, lit("サービス")).otherwise(lit("その他")))\
-                      .withColumn("comment", expr("concat('Feedback_', feedback_id)"))
+    """
+    フィードバックデータを生成し、指定された数のデータを返します。
     
-    # 傾向スコアに基づいてratingを調整
-    adjusted_feedbacks = feedbacks.join(users, "user_id").join(products.select("product_id","category","subcategory"), "product_id")
+    パラメータ:
+    users (DataFrame): ユーザーデータを含むSpark DataFrame
+    products (DataFrame): 商品データを含むSpark DataFrame
+    num_feedbacks (int): 生成するフィードバックの数 (デフォルトは50000)
+    
+    戻り値:
+    DataFrame: 生成されたフィードバック情報を含むSpark DataFrame
+    
+    各フィードバックには以下のカラムが含まれます:
+    - feedback_id: フィードバックID (1からnum_feedbacksまでの範囲)
+    - user_id: ユーザーID (1から登録ユーザー数までの範囲)
+    - product_id: 商品ID (1から登録商品数までの範囲)
+    - rating: 評価 (1以上5以下の整数、傾向スコアによって調整)
+    - date: フィードバック日付 (2021年1月1日から2022年1月1日までの範囲)
+    - type: フィードバック種別 (商品45%、サービス45%、その他10%)
+    - comment: コメント (Feedback_[feedback_id]の形式)
+    
+    傾向スコア:
+    ユーザーの属性や商品カテゴリに基づいて評価を調整します。
+    最終的な評価は0以上5以下の範囲に収まるように調整されます。
+    """
+    feedbacks = (
+        spark.range(1, num_feedbacks + 1)
+        .withColumnRenamed("id", "feedback_id")
+        .withColumn("user_id", expr(f"floor(rand() * {users.count()}) + 1"))
+        .withColumn("product_id", expr(f"floor(rand() * {products.count()}) + 1"))
+        .withColumn("rating", round(rand() * 4 + 1))
+        .withColumn("date", expr("date_add(date('2022-01-01'), -CAST(rand() * 365 AS INTEGER))"))
+        .withColumn("rand_type", rand())
+        .withColumn(
+            "type",
+            when(col("rand_type") < 0.45, lit("商品"))
+            .when(col("rand_type") < 0.90, lit("サービス"))
+            .otherwise(lit("その他"))
+        )
+        .drop("rand_type")
+        .withColumn("comment", expr("concat('Feedback_', feedback_id)"))
+    )
+    
+    # 傾向スコアに基づいて評価を調整
+    adjusted_feedbacks = feedbacks.join(users, "user_id").join(products.select("product_id", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
-        adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", when(condition, col("rating") + adjustment).otherwise(col("rating")))
-    
-    
-    adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", greatest(lit(0), least(lit(5), "rating")))
+        adjusted_feedbacks = adjusted_feedbacks.withColumn("rating",
+            when(condition, col("rating") + adjustment).otherwise(col("rating")))
+    adjusted_feedbacks = adjusted_feedbacks.withColumn("rating",greatest(lit(0), least(lit(5), "rating")))
+
+    # 調整済みフィードバックデータを返却
     return adjusted_feedbacks.select("feedback_id", "user_id", "product_id", "rating", "date", "type", "comment")
 
+users = spark.table("users")
+products = spark.table("products")
 transactions = generate_transactions(users, products)
 feedbacks = generate_feedbacks(users, products)
 
 # 結果の表示（データフレームのサイズによっては表示が重くなる可能性があるため、小さなサンプルで表示）
-transactions.show(5)
-feedbacks.show(5)
+display(transactions.limit(5))
+display(feedbacks.limit(5))
 
 # COMMAND ----------
 
 # DBTITLE 1,テーブルの書き込み
-users.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("users")
-products.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("products")
 transactions.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("transactions")
 feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("feedbacks")
 
@@ -236,9 +383,9 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE transactions ALTER COLUMN transaction_date COMMENT "購入日";
 # MAGIC ALTER TABLE transactions ALTER COLUMN product_id COMMENT "商品ID: productsテーブルのproduct_idとリンクする外部キー";
 # MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "購入数量: 1以上";
-# MAGIC ALTER TABLE transactions ALTER COLUMN price COMMENT "購入時価格: 0以上";
+# MAGIC ALTER TABLE transactions ALTER COLUMN transaction_price COMMENT "購入時価格: 0以上, transactions.quantity * products.price で計算";
 # MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "店舗ID";
-# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日時や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
+# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
 # MAGIC
 # MAGIC ALTER TABLE products ALTER COLUMN product_id COMMENT "商品ID";
 # MAGIC ALTER TABLE products ALTER COLUMN product_name COMMENT "商品名";
@@ -336,3 +483,133 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC CREATE FUNCTION mask_email(email STRING) RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END;
 # MAGIC ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
 # MAGIC ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email;
+
+# COMMAND ----------
+
+# DBTITLE 1,地域ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC WITH region_sales AS (
+# MAGIC   SELECT
+# MAGIC     u.region,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
+# MAGIC   FROM
+# MAGIC     transactions t
+# MAGIC   JOIN
+# MAGIC     users u ON t.user_id = u.user_id
+# MAGIC   JOIN
+# MAGIC     products p ON t.product_id = p.product_id
+# MAGIC   WHERE
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND u.region IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     u.region,
+# MAGIC     p.category
+# MAGIC ),
+# MAGIC total_region_sales AS (
+# MAGIC   SELECT
+# MAGIC     region,
+# MAGIC     SUM(total_sales) AS region_total_sales
+# MAGIC   FROM
+# MAGIC     region_sales
+# MAGIC   GROUP BY
+# MAGIC     region
+# MAGIC )
+# MAGIC SELECT
+# MAGIC   region_sales.region,
+# MAGIC   region_sales.category,
+# MAGIC   FLOOR(region_sales.total_sales),
+# MAGIC   ROUND((region_sales.total_sales / total_region_sales.region_total_sales) * 100, 2) AS sales_ratio
+# MAGIC FROM
+# MAGIC   region_sales JOIN total_region_sales ON region_sales.region = total_region_sales.region
+# MAGIC ORDER BY
+# MAGIC   region_sales.region,
+# MAGIC   region_sales.category;
+
+# COMMAND ----------
+
+# DBTITLE 1,性別ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC WITH gender_sales AS (
+# MAGIC   SELECT
+# MAGIC     u.gender,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
+# MAGIC   FROM
+# MAGIC     transactions t
+# MAGIC   JOIN
+# MAGIC     users u ON t.user_id = u.user_id
+# MAGIC   JOIN
+# MAGIC     products p ON t.product_id = p.product_id
+# MAGIC   WHERE
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND u.gender IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     u.gender,
+# MAGIC     p.category
+# MAGIC ),
+# MAGIC total_gender_sales AS (
+# MAGIC   SELECT
+# MAGIC     gender,
+# MAGIC     SUM(total_sales) AS gender_total_sales
+# MAGIC   FROM
+# MAGIC     gender_sales
+# MAGIC   GROUP BY
+# MAGIC     gender
+# MAGIC )
+# MAGIC SELECT
+# MAGIC   gender_sales.gender,
+# MAGIC   gender_sales.category,
+# MAGIC   FLOOR(gender_sales.total_sales),
+# MAGIC   ROUND((gender_sales.total_sales / total_gender_sales.gender_total_sales) * 100, 2) AS sales_ratio
+# MAGIC FROM
+# MAGIC   gender_sales
+# MAGIC JOIN
+# MAGIC   total_gender_sales ON gender_sales.gender = total_gender_sales.gender
+# MAGIC ORDER BY
+# MAGIC   gender_sales.gender,
+# MAGIC   gender_sales.category;
+
+# COMMAND ----------
+
+# DBTITLE 1,年齢層ごとの商品カテゴリの売上高と売上比率を計算
+# MAGIC %sql
+# MAGIC WITH age_group_sales AS (
+# MAGIC   SELECT
+# MAGIC     gu.age_group,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
+# MAGIC   FROM
+# MAGIC     transactions t
+# MAGIC   JOIN
+# MAGIC     gold_user gu ON t.user_id = gu.user_id
+# MAGIC   JOIN
+# MAGIC     products p ON t.product_id = p.product_id
+# MAGIC   WHERE
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND gu.age_group IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     gu.age_group,
+# MAGIC     p.category
+# MAGIC ),
+# MAGIC total_age_group_sales AS (
+# MAGIC   SELECT
+# MAGIC     age_group,
+# MAGIC     SUM(total_sales) AS age_group_total_sales
+# MAGIC   FROM
+# MAGIC     age_group_sales
+# MAGIC   GROUP BY
+# MAGIC     age_group
+# MAGIC )
+# MAGIC SELECT
+# MAGIC   age_group_sales.age_group,
+# MAGIC   age_group_sales.category,
+# MAGIC   FLOOR(age_group_sales.total_sales),
+# MAGIC   ROUND((age_group_sales.total_sales / total_age_group_sales.age_group_total_sales) * 100, 2) AS sales_ratio
+# MAGIC FROM
+# MAGIC   age_group_sales
+# MAGIC JOIN
+# MAGIC   total_age_group_sales ON age_group_sales.age_group = total_age_group_sales.age_group
+# MAGIC ORDER BY
+# MAGIC   age_group_sales.age_group,
+# MAGIC   age_group_sales.category;
