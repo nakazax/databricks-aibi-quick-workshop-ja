@@ -129,37 +129,37 @@ conditions = [
     ((col("region") == "沖縄") & (col("subcategory") == "果物"), 2),
     
     # 中年層は健康に対する意識が高まり、野菜の消費を増やす。
-    ((col("age") >= 35) & (col("age") < 50) & (col("subcategory") == "野菜"), 2),
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "野菜"), 2),
     
     # 若年層の男性は、スポーツやアウトドア関連の商品に関心が高いと仮定する。
-    ((col("age") < 30) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
+    ((col("age") < 35) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
     
-    # 高齢者は、健康関連商品や日用品に対して高い関心を持つ。
-    ((col("age") >= 60) & (col("category") == "日用品"), -2),
+    # シニア層は、健康関連商品や日用品に対して高い関心を持つ。
+    ((col("age") >= 55) & (col("category") == "日用品"), -2),
     
     # 女性は美容と健康に関連する食品に対して高い関心を持つ。
     ((col("gender") == "女性") & (col("category") == "食料品"), 1),
     
     # 東京の若年層はトレンドに敏感であり、新商品を試す傾向がある。
-    ((col("region") == "東京") & (col("age") < 30), 1),
+    ((col("region") == "東京") & (col("age") < 35), 1),
     
     # 大阪の中年層は家庭を持つことが多く、食料品の購入量が増える。
-    ((col("region") == "大阪") & (col("age") >= 30) & (col("age") < 50) & (col("category") == "食料品"), 2),
+    ((col("region") == "大阪") & (col("age") >= 35) & (col("age") < 55) & (col("category") == "食料品"), 2),
     
     # 福岡のユーザーは地域の特産品に対して高い関心を持ち、関連商品の購入を好む。
     ((col("region") == "福岡") & (col("subcategory") == "野菜"), 1),
     
     # 北海道の若年層はアウトドア活動に関心が高いと仮定し、関連商品の購入が増える。
-    ((col("region") == "北海道") & (col("age") < 30) & (col("category") == "日用品"), 1),
+    ((col("region") == "北海道") & (col("age") < 35) & (col("category") == "日用品"), 1),
     
-    # 沖縄の高齢者は地元の伝統食に高い関心を持つ。
-    ((col("region") == "沖縄") & (col("age") >= 60) & (col("category") == "食料品"), -2),
+    # 沖縄のシニア層は地元の伝統食に高い関心を持つ。
+    ((col("region") == "沖縄") & (col("age") >= 55) & (col("category") == "食料品"), -2),
     
     # 若年層は便利さを求めて日用品を購入する傾向がある。
-    ((col("age") < 25) & (col("category") == "日用品"), 1),
+    ((col("age") < 35) & (col("category") == "日用品"), 1),
     
     # 中年層の男性は、家庭用品に対する責任感から、関連商品の購入量を増やす。
-    ((col("age") >= 35) & (col("age") < 50) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
+    ((col("age") >= 35) & (col("age") < 55) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
 ]
 
 # トランザクションデータの生成
@@ -181,13 +181,12 @@ def generate_transactions(users, products, num_transactions=1000000):
         .drop("random_date", "month", "is_weekend")
     )
 
-    # 傾向スコアに基づいて数量を調整
+    # ユーザーと商品データをジョインして傾向スコアに基づいて数量を調整
     adjusted_transaction = transactions.join(users, "user_id").join(products.select("product_id", "price", "category", "subcategory"), "product_id")
     for condition, adjustment in conditions:
         adjusted_transaction = adjusted_transaction.withColumn("quantity", when(condition, col("quantity") + adjustment).otherwise(col("quantity")))
-    adjusted_transaction = adjusted_transaction.withColumn("quantity", greatest(lit(0), "quantity"))
 
-    # 購入時価格を数量 × 販売価格に設定
+    adjusted_transaction = adjusted_transaction.withColumn("quantity", greatest(lit(0), "quantity"))
     adjusted_transaction = adjusted_transaction.withColumn("transaction_price", col("quantity") * col("price"))
 
     return adjusted_transaction.select("transaction_id", "user_id", "product_id", "quantity", "transaction_price", "transaction_date", "store_id")
@@ -349,36 +348,36 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,地域ごとの商品カテゴリの売上高と売上比率を計算
 # MAGIC %sql
-# MAGIC -- 地域ごとの商品カテゴリの売上高と売上比率を計算
-# MAGIC WITH region_category_sales AS (
-# MAGIC     SELECT 
-# MAGIC         u.region,
-# MAGIC         p.category,
-# MAGIC         SUM(t.transaction_price) AS total_sales
-# MAGIC     FROM transactions t
-# MAGIC     JOIN users u ON t.user_id = u.user_id
-# MAGIC     JOIN products p ON t.product_id = p.product_id
-# MAGIC     GROUP BY u.region, p.category
+# MAGIC WITH `region_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `region`,
+# MAGIC     `category`,
+# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC   FROM
+# MAGIC     `transactions`
+# MAGIC   WHERE
+# MAGIC     `transaction_price` IS NOT NULL
+# MAGIC     AND `region` IS NOT NULL
+# MAGIC   GROUP BY
+# MAGIC     `region`,
+# MAGIC     `category`
 # MAGIC ),
-# MAGIC region_sales_total AS (
-# MAGIC     -- 地域ごとの全売上高を集計
-# MAGIC     SELECT 
-# MAGIC         region,
-# MAGIC         SUM(total_sales) AS total_region_sales
-# MAGIC     FROM region_category_sales
-# MAGIC     GROUP BY region
+# MAGIC `total_region_sales` AS (
+# MAGIC   SELECT
+# MAGIC     `region`,
+# MAGIC     SUM(`total_sales`) AS `region_total_sales`
+# MAGIC   FROM
+# MAGIC     `region_sales`
+# MAGIC   GROUP BY
+# MAGIC     `region`
 # MAGIC )
-# MAGIC
-# MAGIC -- 最終的に地域ごとのカテゴリ売上高と売上比率を計算
-# MAGIC SELECT 
-# MAGIC     rcs.region,
-# MAGIC     rcs.category,
-# MAGIC     rcs.total_sales,
-# MAGIC     rst.total_region_sales,
-# MAGIC     CASE 
-# MAGIC         WHEN rst.total_region_sales > 0 THEN (rcs.total_sales / rst.total_region_sales) * 100
-# MAGIC         ELSE 0
-# MAGIC     END AS sales_ratio
-# MAGIC FROM region_category_sales rcs
-# MAGIC JOIN region_sales_total rst ON rcs.region = rst.region
-# MAGIC ORDER BY rcs.region, rcs.total_sales DESC;
+# MAGIC SELECT
+# MAGIC   `region_sales`.`region`,
+# MAGIC   `region_sales`.`category`,
+# MAGIC   FLOOR(`region_sales`.`total_sales`),
+# MAGIC   ROUND((`region_sales`.`total_sales` / `total_region_sales`.`region_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC FROM
+# MAGIC   `region_sales` JOIN `total_region_sales` ON `region_sales`.`region` = `total_region_sales`.`region`
+# MAGIC ORDER BY
+# MAGIC   `region_sales`.`region`,
+# MAGIC   `region_sales`.`category`;
