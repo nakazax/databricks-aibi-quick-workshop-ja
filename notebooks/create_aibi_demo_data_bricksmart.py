@@ -385,7 +385,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "購入数量: 1以上";
 # MAGIC ALTER TABLE transactions ALTER COLUMN transaction_price COMMENT "購入時価格: 0以上, transactions.quantity * products.price で計算";
 # MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "店舗ID";
-# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日時や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
+# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
 # MAGIC
 # MAGIC ALTER TABLE products ALTER COLUMN product_id COMMENT "商品ID";
 # MAGIC ALTER TABLE products ALTER COLUMN product_name COMMENT "商品名";
@@ -490,17 +490,21 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 # MAGIC %sql
 # MAGIC WITH `region_sales` AS (
 # MAGIC   SELECT
-# MAGIC     `region`,
-# MAGIC     `category`,
-# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC     u.`region`,
+# MAGIC     p.`category`,
+# MAGIC     SUM(t.`transaction_price`) AS `total_sales`
 # MAGIC   FROM
-# MAGIC     `transactions`
+# MAGIC     `transactions` t
+# MAGIC   JOIN
+# MAGIC     `users` u ON t.user_id = u.user_id
+# MAGIC   JOIN
+# MAGIC     `products` p ON t.product_id = p.product_id
 # MAGIC   WHERE
-# MAGIC     `transaction_price` IS NOT NULL
-# MAGIC     AND `region` IS NOT NULL
+# MAGIC     t.`transaction_price` IS NOT NULL
+# MAGIC     AND u.`region` IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     `region`,
-# MAGIC     `category`
+# MAGIC     u.`region`,
+# MAGIC     p.`category`
 # MAGIC ),
 # MAGIC `total_region_sales` AS (
 # MAGIC   SELECT
