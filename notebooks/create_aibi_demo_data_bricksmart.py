@@ -488,124 +488,124 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,地域ごとの商品カテゴリの売上高と売上比率を計算
 # MAGIC %sql
-# MAGIC WITH `region_sales` AS (
+# MAGIC WITH region_sales AS (
 # MAGIC   SELECT
-# MAGIC     u.`region`,
-# MAGIC     p.`category`,
-# MAGIC     SUM(t.`transaction_price`) AS `total_sales`
+# MAGIC     u.region,
+# MAGIC     p.category,
+# MAGIC     SUM(t.transaction_price) AS total_sales
 # MAGIC   FROM
-# MAGIC     `transactions` t
+# MAGIC     transactions t
 # MAGIC   JOIN
-# MAGIC     `users` u ON t.user_id = u.user_id
+# MAGIC     users u ON t.user_id = u.user_id
 # MAGIC   JOIN
-# MAGIC     `products` p ON t.product_id = p.product_id
+# MAGIC     products p ON t.product_id = p.product_id
 # MAGIC   WHERE
-# MAGIC     t.`transaction_price` IS NOT NULL
-# MAGIC     AND u.`region` IS NOT NULL
+# MAGIC     t.transaction_price IS NOT NULL
+# MAGIC     AND u.region IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     u.`region`,
-# MAGIC     p.`category`
+# MAGIC     u.region,
+# MAGIC     p.category
 # MAGIC ),
-# MAGIC `total_region_sales` AS (
+# MAGIC total_region_sales AS (
 # MAGIC   SELECT
-# MAGIC     `region`,
-# MAGIC     SUM(`total_sales`) AS `region_total_sales`
+# MAGIC     region,
+# MAGIC     SUM(total_sales) AS region_total_sales
 # MAGIC   FROM
-# MAGIC     `region_sales`
+# MAGIC     region_sales
 # MAGIC   GROUP BY
-# MAGIC     `region`
+# MAGIC     region
 # MAGIC )
 # MAGIC SELECT
-# MAGIC   `region_sales`.`region`,
-# MAGIC   `region_sales`.`category`,
-# MAGIC   FLOOR(`region_sales`.`total_sales`),
-# MAGIC   ROUND((`region_sales`.`total_sales` / `total_region_sales`.`region_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC   region_sales.region,
+# MAGIC   region_sales.category,
+# MAGIC   FLOOR(region_sales.total_sales),
+# MAGIC   ROUND((region_sales.total_sales / total_region_sales.region_total_sales) * 100, 2) AS sales_ratio
 # MAGIC FROM
-# MAGIC   `region_sales` JOIN `total_region_sales` ON `region_sales`.`region` = `total_region_sales`.`region`
+# MAGIC   region_sales JOIN total_region_sales ON region_sales.region = total_region_sales.region
 # MAGIC ORDER BY
-# MAGIC   `region_sales`.`region`,
-# MAGIC   `region_sales`.`category`;
+# MAGIC   region_sales.region,
+# MAGIC   region_sales.category;
 
 # COMMAND ----------
 
 # DBTITLE 1,性別ごとの商品カテゴリの売上高と売上比率を計算
 # MAGIC %sql
-# MAGIC WITH `gender_sales` AS (
+# MAGIC WITH gender_sales AS (
 # MAGIC   SELECT
-# MAGIC     `gender`,
-# MAGIC     `category`,
-# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC     gender,
+# MAGIC     category,
+# MAGIC     SUM(transaction_price) AS total_sales
 # MAGIC   FROM
-# MAGIC     `transactions` t
+# MAGIC     transactions t
 # MAGIC   JOIN
-# MAGIC     `users` u ON t.user_id = u.user_id
+# MAGIC     users u ON t.user_id = u.user_id
 # MAGIC   WHERE
-# MAGIC     `transaction_price` IS NOT NULL
-# MAGIC     AND `gender` IS NOT NULL
+# MAGIC     transaction_price IS NOT NULL
+# MAGIC     AND gender IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     `gender`,
-# MAGIC     `category`
+# MAGIC     gender,
+# MAGIC     category
 # MAGIC ),
-# MAGIC `total_gender_sales` AS (
+# MAGIC total_gender_sales AS (
 # MAGIC   SELECT
-# MAGIC     `gender`,
-# MAGIC     SUM(`total_sales`) AS `gender_total_sales`
+# MAGIC     gender,
+# MAGIC     SUM(total_sales) AS gender_total_sales
 # MAGIC   FROM
-# MAGIC     `gender_sales`
+# MAGIC     gender_sales
 # MAGIC   GROUP BY
-# MAGIC     `gender`
+# MAGIC     gender
 # MAGIC )
 # MAGIC SELECT
-# MAGIC   `gender_sales`.`gender`,
-# MAGIC   `gender_sales`.`category`,
-# MAGIC   FLOOR(`gender_sales`.`total_sales`),
-# MAGIC   ROUND((`gender_sales`.`total_sales` / `total_gender_sales`.`gender_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC   gender_sales.gender,
+# MAGIC   gender_sales.category,
+# MAGIC   FLOOR(gender_sales.total_sales),
+# MAGIC   ROUND((gender_sales.total_sales / total_gender_sales.gender_total_sales) * 100, 2) AS sales_ratio
 # MAGIC FROM
-# MAGIC   `gender_sales`
+# MAGIC   gender_sales
 # MAGIC JOIN
-# MAGIC   `total_gender_sales` ON `gender_sales`.`gender` = `total_gender_sales`.`gender`
+# MAGIC   total_gender_sales ON gender_sales.gender = total_gender_sales.gender
 # MAGIC ORDER BY
-# MAGIC   `gender_sales`.`gender`,
-# MAGIC   `gender_sales`.`category`;
+# MAGIC   gender_sales.gender,
+# MAGIC   gender_sales.category;
 
 # COMMAND ----------
 
 # DBTITLE 1,年齢層ごとの商品カテゴリの売上高と売上比率を計算
 # MAGIC %sql
-# MAGIC WITH `age_group_sales` AS (
+# MAGIC WITH age_group_sales AS (
 # MAGIC   SELECT
-# MAGIC     `age_group`,
-# MAGIC     `category`,
-# MAGIC     SUM(`transaction_price`) AS `total_sales`
+# MAGIC     age_group,
+# MAGIC     category,
+# MAGIC     SUM(transaction_price) AS total_sales
 # MAGIC   FROM
-# MAGIC     `transactions` t
+# MAGIC     transactions t
 # MAGIC   JOIN
-# MAGIC     `gold_user` gu ON t.user_id = gu.user_id
+# MAGIC     gold_user gu ON t.user_id = gu.user_id
 # MAGIC   WHERE
-# MAGIC     `transaction_price` IS NOT NULL
-# MAGIC     AND `age_group` IS NOT NULL
+# MAGIC     transaction_price IS NOT NULL
+# MAGIC     AND age_group IS NOT NULL
 # MAGIC   GROUP BY
-# MAGIC     `age_group`,
-# MAGIC     `category`
+# MAGIC     age_group,
+# MAGIC     category
 # MAGIC ),
-# MAGIC `total_age_group_sales` AS (
+# MAGIC total_age_group_sales AS (
 # MAGIC   SELECT
-# MAGIC     `age_group`,
-# MAGIC     SUM(`total_sales`) AS `age_group_total_sales`
+# MAGIC     age_group,
+# MAGIC     SUM(total_sales) AS age_group_total_sales
 # MAGIC   FROM
-# MAGIC     `age_group_sales`
+# MAGIC     age_group_sales
 # MAGIC   GROUP BY
-# MAGIC     `age_group`
+# MAGIC     age_group
 # MAGIC )
 # MAGIC SELECT
-# MAGIC   `age_group_sales`.`age_group`,
-# MAGIC   `age_group_sales`.`category`,
-# MAGIC   FLOOR(`age_group_sales`.`total_sales`),
-# MAGIC   ROUND((`age_group_sales`.`total_sales` / `total_age_group_sales`.`age_group_total_sales`) * 100, 2) AS `sales_ratio`
+# MAGIC   age_group_sales.age_group,
+# MAGIC   age_group_sales.category,
+# MAGIC   FLOOR(age_group_sales.total_sales),
+# MAGIC   ROUND((age_group_sales.total_sales / total_age_group_sales.age_group_total_sales) * 100, 2) AS sales_ratio
 # MAGIC FROM
-# MAGIC   `age_group_sales`
+# MAGIC   age_group_sales
 # MAGIC JOIN
-# MAGIC   `total_age_group_sales` ON `age_group_sales`.`age_group` = `total_age_group_sales`.`age_group`
+# MAGIC   total_age_group_sales ON age_group_sales.age_group = total_age_group_sales.age_group
 # MAGIC ORDER BY
-# MAGIC   `age_group_sales`.`age_group`,
-# MAGIC   `age_group_sales`.`category`;
+# MAGIC   age_group_sales.age_group,
+# MAGIC   age_group_sales.category;
