@@ -38,7 +38,7 @@ spark.sql(f"USE SCHEMA {new_schema}")
 # COMMAND ----------
 
 # DBTITLE 1,ユーザーデータ・商品データの生成
-from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek
+from pyspark.sql.functions import udf, expr, when, col, lit, round, rand, greatest, least, date_format, dayofweek, concat
 from pyspark.sql.types import StringType
 
 import datetime
@@ -172,6 +172,12 @@ products = generate_products()
 
 display(users.limit(5))
 display(products.limit(5))
+
+# COMMAND ----------
+
+# DBTITLE 1,テーブルの書き込み
+users.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("users")
+products.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("products")
 
 # COMMAND ----------
 
@@ -344,6 +350,8 @@ def generate_feedbacks(users, products, num_feedbacks=50000):
     # 調整済みフィードバックデータを返却
     return adjusted_feedbacks.select("feedback_id", "user_id", "product_id", "rating", "date", "type", "comment")
 
+users = spark.table("users")
+products = spark.table("products")
 transactions = generate_transactions(users, products)
 feedbacks = generate_feedbacks(users, products)
 
@@ -354,8 +362,6 @@ display(feedbacks.limit(5))
 # COMMAND ----------
 
 # DBTITLE 1,テーブルの書き込み
-users.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("users")
-products.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("products")
 transactions.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("transactions")
 feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("feedbacks")
 
