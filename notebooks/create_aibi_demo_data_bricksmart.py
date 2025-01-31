@@ -85,7 +85,20 @@ def generate_products(num_products=100):
     return spark.range(1, num_products + 1).withColumnRenamed("id", "product_id")\
                 .withColumn("product_name", generate_productname_udf())\
                 .withColumn("category", when(rand() > 0.5, lit("食料品")).otherwise(lit("日用品")))\
-                .withColumn("subcategory", when(col("category") == "食料品", when(rand() > 0.5, lit("野菜")).otherwise(lit("果物"))).otherwise(when(rand() > 0.5, lit("洗剤")).otherwise(lit("トイレットペーパー"))))\
+                .withColumn("subcategory", 
+                    when(col("category") == "食料品", 
+                        when(rand() > 0.6, lit("野菜"))
+                        .when(rand() > 0.4, lit("果物"))
+                        .when(rand() > 0.2, lit("健康食品"))
+                        .otherwise(lit("肉類"))
+                    )
+                    .otherwise(
+                        when(rand() > 0.4, lit("キッチン用品"))
+                        .when(rand() > 0.3, lit("スポーツ・アウトドア用品"))
+                        .when(rand() > 0.2, lit("医薬品"))
+                        .otherwise(lit("冷暖房器具"))
+                    )
+                )\
                 .withColumn("price", round(rand() * 1000 + 100, 2))\
                 .withColumn("stock_quantity", round(rand() * 100 + 1))\
                 .withColumn("cost_price", round(col("price") * 0.7, 2))
@@ -101,65 +114,61 @@ display(products.limit(5))
 # DBTITLE 1,販売取引データ・フィードバックデータの生成
 # 購買行動に関する傾向スコア（重み）の設定
 conditions = [
-    # 若年層は新鮮な果物に興味があり、より多く購入する傾向がある。
-    ((col("age") < 25) & (col("subcategory") == "果物"), 1),
-    
-    # 25歳から30歳のユーザーは日用品の購入において実用性を重視しやすい。
-    ((col("age") >= 25) & (col("age") < 30) & (col("category") == "日用品"), 2),
-    
-    # 30歳から35歳は健康に気を使い始め、野菜の購入量が増える。
-    ((col("age") >= 30) & (col("age") < 35) & (col("subcategory") == "野菜"), 1),
-    
-    # 女性は特定の日用品に対して特別なニーズがあり、それに関連する商品の購入を増やす可能性がある。
-    ((col("gender") == "女性") & (col("category") == "日用品"), 1),
-    
-    # 東京のユーザーは食生活において多様性を求める傾向があり、食料品の購入量が増える。
+    # ---------- 地域ごとの傾向 ----------
+    # 東京: 食生活において多様性を求める傾向があり、食料品の購入量が増える
     ((col("region") == "東京") & (col("category") == "食料品"), 1),
-    
-    # 大阪のユーザーは実用的な日用品の購入を好む。
+
+    # 大阪: 実用的な日用品の購入を好む
     ((col("region") == "大阪") & (col("category") == "日用品"), 1),
-    
-    # 福岡のユーザーは新鮮な果物への関心が高い。
-    ((col("region") == "福岡") & (col("subcategory") == "果物"), -2),
-    
-    # 北海道のユーザーは寒い地域特有の生活用品に対する需要が高い。
-    ((col("region") == "北海道") & (col("category") == "日用品"), 1),
-    
-    # 沖縄のユーザーは地元の果物を好む傾向がある。
-    ((col("region") == "沖縄") & (col("subcategory") == "果物"), 2),
-    
-    # 中年層は健康に対する意識が高まり、野菜の消費を増やす。
-    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "野菜"), 2),
-    
-    # 若年層の男性は、スポーツやアウトドア関連の商品に関心が高いと仮定する。
-    ((col("age") < 35) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
-    
-    # シニア層は、健康関連商品や日用品に対して高い関心を持つ。
-    ((col("age") >= 55) & (col("category") == "日用品"), -2),
-    
-    # 女性は美容と健康に関連する食品に対して高い関心を持つ。
-    ((col("gender") == "女性") & (col("category") == "食料品"), 1),
-    
-    # 東京の若年層はトレンドに敏感であり、新商品を試す傾向がある。
-    ((col("region") == "東京") & (col("age") < 35), 1),
-    
-    # 大阪の中年層は家庭を持つことが多く、食料品の購入量が増える。
-    ((col("region") == "大阪") & (col("age") >= 35) & (col("age") < 55) & (col("category") == "食料品"), 2),
-    
-    # 福岡のユーザーは地域の特産品に対して高い関心を持ち、関連商品の購入を好む。
+
+    # 福岡: 健康志向の高い野菜を多く購入
     ((col("region") == "福岡") & (col("subcategory") == "野菜"), 1),
-    
-    # 北海道の若年層はアウトドア活動に関心が高いと仮定し、関連商品の購入が増える。
+
+    # 北海道: 寒冷地のため冷暖房器具の購入量が増える
+    ((col("region") == "北海道") & (col("subcategory") == "冷暖房器具"), 2),
+
+    # 沖縄: 地元の果物への関心が高い。さらに温暖な気候のため冷暖房器具の購入量が増える
+    ((col("region") == "沖縄") & (col("subcategory") == "果物"), 1),
+    ((col("region") == "沖縄") & (col("subcategory") == "冷暖房器具"), 1),
+
+    # ---------- 性別ごとの傾向 ----------
+    # 女性: 食料品や日用品、特にキッチン用品を多く購入
+    ((col("gender") == "女性") & (col("category") == "食料品"), 1),
+    ((col("gender") == "女性") & (col("category") == "日用品"), 1),
+    ((col("gender") == "女性") & (col("subcategory") == "キッチン用品"), 1),
+
+    # 男性: スポーツやアウトドア関連の商品に関心が高い。さらに肉類を好む傾向が強い
+    ((col("gender") == "男性") & (col("category") == "スポーツ・アウトドア用品"), 2),
+    ((col("gender") == "男性") & (col("subcategory") == "肉類"), 1),
+
+    # ---------- 年齢層ごとの傾向 ----------
+    # 若年層 (18〜34歳): 果物、肉類、スポーツ・アウトドア用品に関心が高い
+    ((col("age") < 35) & (col("subcategory") == "果物"), 1),
+    ((col("age") < 35) & (col("subcategory") == "肉類"), 2),
+    ((col("age") < 35) & (col("subcategory") == "スポーツ・アウトドア用品"), 2),
+
+    # 中年層 (35〜54歳): 健康志向が高まり野菜の購入量が増える。肉類もそれなりに購入。医薬品の購入量も増える
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "野菜"), 1),
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "肉類"), 1),
+    ((col("age") >= 35) & (col("age") < 55) & (col("subcategory") == "医薬品"), 1),
+
+    # シニア層 (55歳以上): 果物と野菜、医薬品の購入量が増える
+    ((col("age") >= 55) & (col("subcategory") == "果物"), 2),
+    ((col("age") >= 55) & (col("subcategory") == "野菜"), 2),
+    ((col("age") >= 55) & (col("subcategory") == "医薬品"), 2),
+
+    # ---------- 組み合わせによる傾向 ----------
+    # 東京の若年層: 消費行動が旺盛で全体的な購入量が多い
+    ((col("region") == "東京") & (col("age") < 35), 1),
+
+    # 大阪の中年層: 家庭を持ち、食料品の購入量が増える
+    ((col("region") == "大阪") & (col("age") >= 35) & (col("age") < 55) & (col("category") == "食料品"), 2),
+
+    # 北海道の若年層: アウトドア活動に関連する日用品を購入する
     ((col("region") == "北海道") & (col("age") < 35) & (col("category") == "日用品"), 1),
-    
-    # 沖縄のシニア層は地元の伝統食に高い関心を持つ。
-    ((col("region") == "沖縄") & (col("age") >= 55) & (col("category") == "食料品"), -2),
-    
-    # 若年層は便利さを求めて日用品を購入する傾向がある。
-    ((col("age") < 35) & (col("category") == "日用品"), 1),
-    
-    # 中年層の男性は、家庭用品に対する責任感から、関連商品の購入量を増やす。
-    ((col("age") >= 35) & (col("age") < 55) & (col("gender") == "男性") & (col("category") == "日用品"), 1),
+
+    # 沖縄のシニア層は地元の伝統食に高い関心を持つ
+    ((col("region") == "沖縄") & (col("age") >= 55) & (col("category") == "食料品"), 2),
 ]
 
 # トランザクションデータの生成
@@ -205,9 +214,8 @@ def generate_feedbacks(users, products, num_feedbacks=50000):
     adjusted_feedbacks = feedbacks.join(users, "user_id").join(products.select("product_id","category","subcategory"), "product_id")
     for condition, adjustment in conditions:
         adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", when(condition, col("rating") + adjustment).otherwise(col("rating")))
-    
-    
     adjusted_feedbacks = adjusted_feedbacks.withColumn("rating", greatest(lit(0), least(lit(5), "rating")))
+
     return adjusted_feedbacks.select("feedback_id", "user_id", "product_id", "rating", "date", "type", "comment")
 
 transactions = generate_transactions(users, products)
