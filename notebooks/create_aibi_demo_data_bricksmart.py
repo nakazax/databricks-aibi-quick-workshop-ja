@@ -437,7 +437,7 @@ feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(
 
 # DBTITLE 1,gold_usersテーブルのメタデータ編集
 # MAGIC %sql
-# MAGIC ALTER TABLE gold_user ALTER COLUMN age_group COMMENT "年齢層: 若年層(～34歳), 中年層(35～54歳), シニア層(55歳～)";
+# MAGIC ALTER TABLE gold_user ALTER COLUMN age_group COMMENT "年齢層: 若年層, 中年層, シニア層\n\n- 若年層: 35歳未満\n- 中年層: 35歳以上55歳未満\n- シニア層: 55歳以上";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN food_quantity COMMENT "食料品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN daily_quantity COMMENT "日用品の合計購買点数";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN other_quantity COMMENT "その他の合計購買点数";
