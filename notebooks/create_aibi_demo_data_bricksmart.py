@@ -361,9 +361,28 @@ display(feedbacks.limit(5))
 
 # COMMAND ----------
 
-# DBTITLE 1,テーブルの書き込み
-transactions.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("transactions")
-feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("feedbacks")
+# MAGIC %md
+# MAGIC Note: トランザクションとフィードバックのテーブルへの書き込みについて、リネージの流れを直感的に分かりやすいものにするために一旦一時テーブルに書き込み、DEEP CLONEを使用してメインテーブルを作成する。
+
+# COMMAND ----------
+
+# DBTITLE 1,一時テーブルへの書き込み
+transactions.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("transactions_temp")
+feedbacks.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("feedbacks_temp")
+
+# COMMAND ----------
+
+# DBTITLE 1,DEEP CLONEを使用して一時テーブルからメインテーブルを作成
+spark.sql("DROP TABLE IF EXISTS transactions")
+spark.sql("CREATE TABLE transactions DEEP CLONE transactions_temp")
+spark.sql("DROP TABLE IF EXISTS feedbacks")
+spark.sql("CREATE TABLE feedbacks DEEP CLONE feedbacks_temp")
+
+# COMMAND ----------
+
+# DBTITLE 1,一時テーブルの削除
+spark.sql("DROP TABLE transactions_temp")
+spark.sql("DROP TABLE feedbacks_temp")
 
 # COMMAND ----------
 
