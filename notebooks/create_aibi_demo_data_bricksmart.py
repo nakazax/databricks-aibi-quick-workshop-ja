@@ -1,39 +1,44 @@
 # Databricks notebook source
 # DBTITLE 1,パラメーターの設定
 # Widgetsの作成
-dbutils.widgets.text("catalog", "aibi_demo_catalog", "カタログ名")
-dbutils.widgets.text("new_schema", "bricksmart", "新規スキーマ名")
-dbutils.widgets.text("existing_schema", "bricksmart", "既存スキーマ名")
+dbutils.widgets.text("catalog", "aibi_demo_catalog", "カタログ")
+dbutils.widgets.text("schema", "bricksmart", "スキーマ")
+dbutils.widgets.dropdown("recreate_schema", "False", ["True", "False"], "スキーマを再作成")
 
 # Widgetからの値の取得
 catalog = dbutils.widgets.get("catalog")
-new_schema = dbutils.widgets.get("new_schema")
-existing_schema = dbutils.widgets.get("existing_schema")
+schema = dbutils.widgets.get("schema")
+recreate_schema = dbutils.widgets.get("recreate_schema") == "True"
 
 # COMMAND ----------
 
 # DBTITLE 1,パラメーターのチェック
 print(f"catalog: {catalog}")
-print(f"new_schema: {new_schema}")
-print(f"existing_schema: {existing_schema}")
+print(f"schema: {schema}")
+print(f"recreate_schema: {recreate_schema}")
 
 if not catalog:
-    raise ValueError("存在するカタログ名を入力してください。")
-if not new_schema:
-    raise ValueError("新規スキーマ名を入力してください。")
+    raise ValueError("存在するカタログ名を入力してください")
+if not schema:
+    raise ValueError("スキーマ名を入力してください")
 
 # COMMAND ----------
 
-# DBTITLE 1,カタログ指定・スキーマのリセット
-# 新規スキーマを指定する場合
+# DBTITLE 1,カタログ指定・スキーマの設定
+# カタログを指定
 spark.sql(f"USE CATALOG {catalog}")
-spark.sql(f"DROP SCHEMA IF EXISTS {new_schema} CASCADE;")
-spark.sql(f"CREATE SCHEMA if not exists {new_schema}")
-spark.sql(f"USE SCHEMA {new_schema}")
 
-# 既存スキーマを指定する場合
-# spark.sql(f"USE CATALOG {catalog}")
-# spark.sql(f"USE SCHEMA {existing_schema}")
+# スキーマを再作成するかどうか
+if recreate_schema:
+    print(f"スキーマ {schema} を一度削除してから作成します")
+    spark.sql(f"DROP SCHEMA IF EXISTS {schema} CASCADE;")
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+else:
+    print(f"スキーマ {schema} が存在しない場合は作成します (存在する場合は何もしません)")
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+
+# スキーマを使用
+spark.sql(f"USE SCHEMA {schema}")
 
 # COMMAND ----------
 
@@ -82,10 +87,10 @@ def generate_users(num_users=10000):
     - user_id: ユーザーID (1からnum_usersまでの範囲)
     - name: ランダムなユーザー名
     - age: ランダムな年齢 (一様分布: 18歳以上78歳未満)
-    - gender: ランダムな性別 (男性48%、女性47%、その他2%、未回答3%)
+    - gender: 男性48%、女性47%、その他2%、未回答3%
     - email: ユーザー名を基にしたメールアドレス
     - registration_date: 固定の日付 (2020年1月1日)
-    - region: ランダムな地域 (一様分布: 北海道、東京、大阪、福岡、沖縄)
+    - region: 東京40%、大阪25%、北海道20%、福岡10%、沖縄5%
     """
     return (
         spark.range(1, num_users + 1)
@@ -105,11 +110,11 @@ def generate_users(num_users=10000):
         .withColumn("rand_region", rand())
         .withColumn(
             "region",
-            when(col("rand_region") < 0.2, lit("北海道"))
-            .when(col("rand_region") < 0.4, lit("東京"))
-            .when(col("rand_region") < 0.6, lit("大阪"))
-            .when(col("rand_region") < 0.8, lit("福岡"))
-            .otherwise(lit("沖縄"))
+            when(col("rand_region") < 0.40, lit("東京")) # 40%
+            .when(col("rand_region") < 0.65, lit("大阪")) # 40% + 25% = 65%
+            .when(col("rand_region") < 0.85, lit("北海道")) # 65% + 20% = 85%
+            .when(col("rand_region") < 0.95, lit("福岡")) # 85% + 10% = 95%
+            .otherwise(lit("沖縄")) # 残り5%
         )
         .drop("rand_gender", "rand_region")
     )
@@ -395,7 +400,7 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE users ALTER COLUMN email COMMENT "メールアドレス";
 # MAGIC ALTER TABLE users ALTER COLUMN registration_date COMMENT "登録日";
 # MAGIC ALTER TABLE users ALTER COLUMN region COMMENT "地域: 例) 東京, 大阪, 北海道";
-# MAGIC COMMENT ON TABLE users IS '**usersテーブル**\nオンラインスーパー「ブリックスマート」に登録されているユーザー情報を保持するテーブルです。\n- ユーザーの基本情報（氏名、年齢、性別、地域など）や連絡先（メールアドレス）を管理\n- ユーザーのセグメンテーションや嗜好分析、マーケティング効果測定などに活用できます';
+# MAGIC COMMENT ON TABLE users IS '**users テーブル**\nオンラインスーパー「ブリックスマート」に登録されているユーザー情報を保持するテーブルです。\n- ユーザーの基本情報（氏名、年齢、性別、地域など）や連絡先（メールアドレス）を管理\n- ユーザーのセグメンテーションや嗜好分析、マーケティング効果測定などに活用できます';
 # MAGIC
 # MAGIC ALTER TABLE transactions ALTER COLUMN transaction_id COMMENT "トランザクションID";
 # MAGIC ALTER TABLE transactions ALTER COLUMN user_id COMMENT "ユーザーID: usersテーブルのuser_idとリンクする外部キー";
@@ -404,7 +409,7 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE transactions ALTER COLUMN quantity COMMENT "購入数量: 1以上";
 # MAGIC ALTER TABLE transactions ALTER COLUMN transaction_price COMMENT "購入時価格: 0以上, transactions.quantity * products.price で計算";
 # MAGIC ALTER TABLE transactions ALTER COLUMN store_id COMMENT "店舗ID";
-# MAGIC COMMENT ON TABLE transactions IS '**transactionsテーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
+# MAGIC COMMENT ON TABLE transactions IS '**transactions テーブル**\nオンラインスーパー「ブリックスマート」で行われた販売取引（購入履歴）の情報を管理するテーブルです。\n- ユーザーIDや商品IDなど他テーブルと関連付けしつつ、購入日や価格、数量などを保持\n- 販売動向の分析、ユーザーの購買行動追跡、在庫・マーケティング戦略の最適化に役立ちます';
 # MAGIC
 # MAGIC ALTER TABLE products ALTER COLUMN product_id COMMENT "商品ID";
 # MAGIC ALTER TABLE products ALTER COLUMN product_name COMMENT "商品名";
@@ -413,7 +418,7 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE products ALTER COLUMN price COMMENT "販売価格: 0以上";
 # MAGIC ALTER TABLE products ALTER COLUMN stock_quantity COMMENT "在庫数量";
 # MAGIC ALTER TABLE products ALTER COLUMN cost_price COMMENT "仕入れ価格";
-# MAGIC COMMENT ON TABLE products IS '**productsテーブル**\nオンラインスーパー「ブリックスマート」で取り扱う商品の情報を管理するテーブルです。\n- 商品名、カテゴリー・サブカテゴリー、価格、在庫数、原価などを保持\n- 在庫管理、価格分析、商品分類や商品のパフォーマンス分析に活用できます';
+# MAGIC COMMENT ON TABLE products IS '**products テーブル**\nオンラインスーパー「ブリックスマート」で取り扱う商品の情報を管理するテーブルです。\n- 商品名、カテゴリー・サブカテゴリー、価格、在庫数、原価などを保持\n- 在庫管理、価格分析、商品分類や商品のパフォーマンス分析に活用できます';
 # MAGIC
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN feedback_id COMMENT "フィードバックID";
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN user_id COMMENT "ユーザーID: usersテーブルのuser_idとリンクする外部キー";
@@ -421,7 +426,7 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN date COMMENT "フィードバック日";
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN type COMMENT "フィードバック種別: 商品, サービス, その他";
 # MAGIC ALTER TABLE feedbacks ALTER COLUMN rating COMMENT "評価: 1～5";
-# MAGIC COMMENT ON TABLE feedbacks IS '**feedbacksテーブル**\nユーザーからのフィードバックを管理するテーブルです。\n- 商品やサービスに対するコメント、評価(1～5)、フィードバック日などを保持\n- ユーザー満足度の把握や改善点の分析、優先度付けに役立ちます';
+# MAGIC COMMENT ON TABLE feedbacks IS '**feedbacks テーブル**\nユーザーからのフィードバックを管理するテーブルです。\n- 商品やサービスに対するコメント、評価(1～5)、フィードバック日などを保持\n- ユーザー満足度の把握や改善点の分析、優先度付けに役立ちます';
 
 # COMMAND ----------
 
@@ -463,7 +468,7 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE gold_user ALTER COLUMN food_rating COMMENT "食料品の平均レビュー評価";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN daily_rating COMMENT "日用品の平均レビュー評価";
 # MAGIC ALTER TABLE gold_user ALTER COLUMN other_rating COMMENT "その他の平均レビュー評価";
-# MAGIC COMMENT ON TABLE gold_user IS '**gold_userテーブル**\nAIを搭載した食品推薦システムに登録したユーザーに関する情報が含まれています。\n- 人口統計学的詳細、食品消費習慣、および評価などを保持\n- ユーザーの嗜好を理解し、食品の消費傾向を追跡、AIシステムの有効性を評価するのに活用\n- 個々のユーザーに合わせた食品推薦やシステム改善の検討にも役立ちます';
+# MAGIC COMMENT ON TABLE gold_user IS '**gold_user テーブル**\nAIを搭載した食品推薦システムに登録したユーザーに関する情報が含まれています。\n- 人口統計学的詳細、食品消費習慣、および評価などを保持\n- ユーザーの嗜好を理解し、食品の消費傾向を追跡、AIシステムの有効性を評価するのに活用\n- 個々のユーザーに合わせた食品推薦やシステム改善の検討にも役立ちます';
 
 # COMMAND ----------
 
@@ -502,6 +507,16 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC CREATE FUNCTION mask_email(email STRING) RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END;
 # MAGIC ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
 # MAGIC ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email;
+
+# COMMAND ----------
+
+# DBTITLE 1,認定済みタグの追加
+# MAGIC %sql
+# MAGIC ALTER TABLE users SET TAGS ('system.Certified');
+# MAGIC ALTER TABLE transactions SET TAGS ('system.Certified');
+# MAGIC ALTER TABLE products SET TAGS ('system.Certified');
+# MAGIC ALTER TABLE feedbacks SET TAGS ('system.Certified');
+# MAGIC ALTER TABLE gold_user SET TAGS ('system.Certified');
 
 # COMMAND ----------
 
