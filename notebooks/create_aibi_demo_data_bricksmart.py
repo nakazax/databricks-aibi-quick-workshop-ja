@@ -495,28 +495,53 @@ spark.sql("DROP TABLE feedbacks_temp")
 # MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_pk PRIMARY KEY (feedback_id);
 # MAGIC ALTER TABLE gold_user ADD CONSTRAINT gold_user_pk PRIMARY KEY (user_id);
 
-# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED RELY;
-# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
-# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED RELY;
-# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED RELY;
+# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED;
+# MAGIC ALTER TABLE transactions ADD CONSTRAINT transactions_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED;
+# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_users_fk FOREIGN KEY (user_id) REFERENCES users (user_id) NOT ENFORCED;
+# MAGIC ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_products_fk FOREIGN KEY (product_id) REFERENCES products (product_id) NOT ENFORCED;
 
 # COMMAND ----------
 
 # DBTITLE 1,列レベルマスキングの追加
-# MAGIC %sql
-# MAGIC CREATE FUNCTION mask_email(email STRING) RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END;
-# MAGIC ALTER TABLE users ALTER COLUMN email SET MASK mask_email;
-# MAGIC ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email;
+try:
+    # マスキング関数の作成
+    spark.sql("""
+    CREATE FUNCTION IF NOT EXISTS mask_email(email STRING) 
+    RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END
+    """)
+    
+    # usersテーブルにマスキングを適用
+    spark.sql("""
+    ALTER TABLE users ALTER COLUMN email SET MASK mask_email
+    """)
+    
+    # gold_userテーブルにマスキングを適用
+    spark.sql("""
+    ALTER TABLE gold_user ALTER COLUMN email SET MASK mask_email
+    """)
+    
+    print("列レベルマスキングの適用が完了しました。")
+    
+except Exception as e:
+    print(f"列レベルマスキングの適用中にエラーが発生しました: {str(e)}")
+    print("このエラーはDBR 15.4より前のバージョンで実行している場合に発生する可能性があります。")
 
 # COMMAND ----------
 
 # DBTITLE 1,認定済みタグの追加
-# MAGIC %sql
-# MAGIC ALTER TABLE users SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE transactions SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE products SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE feedbacks SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE gold_user SET TAGS ('system.Certified');
+certified_tag = 'system.Certified'
+
+try:
+    spark.sql(f"ALTER TABLE users SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE transactions SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE products SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE feedbacks SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE gold_user SET TAGS ('{certified_tag}')")
+    print(f"認定済みタグ '{certified_tag}' の追加が完了しました。")
+
+except Exception as e:
+    print(f"認定済みタグ '{certified_tag}' の追加中にエラーが発生しました: {str(e)}")
+    print("このエラーはタグ機能に対応していないワークスペースで実行した場合に発生する可能性があります。")
 
 # COMMAND ----------
 
