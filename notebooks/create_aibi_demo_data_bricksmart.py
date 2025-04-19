@@ -529,12 +529,19 @@ except Exception as e:
 # COMMAND ----------
 
 # DBTITLE 1,認定済みタグの追加
-# MAGIC %sql
-# MAGIC ALTER TABLE users SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE transactions SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE products SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE feedbacks SET TAGS ('system.Certified');
-# MAGIC ALTER TABLE gold_user SET TAGS ('system.Certified');
+certified_tag = 'system.Certified'
+
+try:
+    spark.sql(f"ALTER TABLE users SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE transactions SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE products SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE feedbacks SET TAGS ('{certified_tag}')")
+    spark.sql(f"ALTER TABLE gold_user SET TAGS ('{certified_tag}')")
+    print(f"認定済みタグ '{certified_tag}' の追加が完了しました。")
+
+except Exception as e:
+    print(f"認定済みタグ '{certified_tag}' の追加中にエラーが発生しました: {str(e)}")
+    print("このエラーはタグ機能に対応していないワークスペースで実行した場合に発生する可能性があります。")
 
 # COMMAND ----------
 
